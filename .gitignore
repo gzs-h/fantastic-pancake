@@ -1,0 +1,11 @@
+# Generated dashboard (rebuild with: python3 generate_dashboard.py)
+*_Wine Cellar Dashboard.html
+Updated_Wine Cellar Dashboard.html
+
+# Legacy / scratch files
+OLD_wine_cellar_dashboard.html
+wine_collection.xlsx
+Archive/
+
+# System
+.DS_Store
