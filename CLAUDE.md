@@ -6,9 +6,10 @@ This file is the operating brief for any Claude session working on this project.
 
 ## What this project is
 
-A self-contained, single-file HTML wine cellar dashboard with a built-in edit UI. There is no backend, no server, no database. Everything lives in two files in this folder:
+A self-contained, single-file HTML wine cellar dashboard with a built-in edit UI. There is no backend, no server, no database. Everything lives in three files in this folder:
 
-- `wines.json` — canonical data source (56 SKUs, 60 bottles as of April 2026)
+- `wines.json` — canonical data source (57 SKUs, 61 bottles as of April 2026)
+- `generate_dashboard.py` — Python script that reads wines.json and writes the dated HTML
 - `YYYYMMDD_Wine Cellar Dashboard.html` — generated dashboard (read-only artifact; regenerated from wines.json)
 
 Excel has been retired. The dashboard is the only interface for managing the collection.
@@ -23,13 +24,18 @@ Every time the HTML dashboard is updated, name it:
 YYYYMMDD_Wine Cellar Dashboard.html
 ```
 
-Use the actual current date (e.g. `20260402_Wine Cellar Dashboard.html`). Overwrite the existing file with the same date; do not accumulate old versions.
+**Versioning logic (apply every time `generate_dashboard.py` is run):**
+1. Check whether a dated dashboard file already exists in this folder.
+2. If the existing file has **today's date** — overwrite it. No archive needed.
+3. If the existing file has an **earlier date** — move it to `Archive/` first, then write the new file with today's date.
+
+This keeps exactly one active dashboard in the folder at all times, with prior versions preserved in `Archive/`.
 
 ---
 
 ## Source of truth
 
-**`wines.json` is always the source of truth for data.** The HTML dashboard is generated from it via `generate_dashboard.py` (located at `/sessions/<session>/generate_dashboard.py` — will need to be reconstructed each session from this brief if not present).
+**`wines.json` is always the source of truth for data.** The HTML dashboard is generated from it via `generate_dashboard.py`, which lives permanently in this folder alongside `wines.json`.
 
 If the HTML and JSON are out of sync, regenerate the HTML from the JSON. Never edit the HTML directly to fix data.
 
@@ -120,13 +126,13 @@ Plus an **Edit Collection drawer** (slide-in panel) for add/edit/remove wine ope
 
 ---
 
-## Collection stats (as of 2026-04-02)
+## Collection stats (as of 2026-04-04)
 
-- 56 SKUs, 60 bottles
+- 57 SKUs, 61 bottles
 - 7 countries: Argentina, Australia, Chile, France, Germany, Italy, USA
-- Styles: red (33), white (10), sparkling (9), rosé (2), dessert (1), orange (1)
+- Styles: red (33), white (10), sparkling (9), rosé (3), dessert (1), orange (1)
 - Vintage span: 1988–2025
-- Market value: ~$4,655
+- Market value: ~$4.7k
 
 ---
 
@@ -152,7 +158,7 @@ Plus an **Edit Collection drawer** (slide-in panel) for add/edit/remove wine ope
 ```bash
 python3 generate_dashboard.py
 ```
-The script reads `wines.json` from this folder and writes the dated HTML back to this folder.
+The script reads `wines.json` from this folder and writes the dated HTML back to this folder. After running, apply the versioning logic above (archive old file if it's from a prior date).
 
 ---
 
@@ -166,12 +172,12 @@ The script reads `wines.json` from this folder and writes the dated HTML back to
 
 ---
 
-## Regenerating generate_dashboard.py
+## generate_dashboard.py
 
-If the session is fresh and the script is missing, it must be reconstructed. The script is ~840 lines of Python that:
+The script lives permanently in this folder and is tracked in git. It should not need to be reconstructed. If it is somehow missing, it can be rebuilt — it is ~500 lines of Python that:
 1. Reads `wines.json`
 2. Computes stats (bottles, value, style/country counts)
 3. Assembles HTML via string list (`p = []`)
 4. Outputs `YYYYMMDD_Wine Cellar Dashboard.html`
 
-Refer to the session transcript or prior CLAUDE.md history to recover it, or rebuild from this brief + the wines.json schema above.
+The curated collection narrative lives in `OVERVIEW_PARAS` and `GAP_ITEMS` near the top of the script — update those when the collection changes significantly without needing to touch the rest of the script.

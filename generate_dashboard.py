@@ -103,9 +103,22 @@ GAP_ITEMS = [
      'Zin (2 vintages), Littorai Wendling (2).'),
 ]
 
-# ── output path ───────────────────────────────────────────────────────────────
+# ── output path + versioning ──────────────────────────────────────────────────
+# Rule: one active dashboard in the folder at a time.
+#   - Same day as existing file  → overwrite in place (no archive)
+#   - Newer day than existing    → move old file to Archive/, write new dated file
+import glob, shutil
+
 today_str = date.today().strftime('%Y%m%d')
 out_path = os.path.join(DIR, today_str + '_Wine Cellar Dashboard.html')
+
+existing = [f for f in glob.glob(os.path.join(DIR, '*_Wine Cellar Dashboard.html'))
+            if os.path.basename(f) != os.path.basename(out_path)]
+for old_file in existing:
+    archive_dir = os.path.join(DIR, 'Archive')
+    os.makedirs(archive_dir, exist_ok=True)
+    shutil.move(old_file, os.path.join(archive_dir, os.path.basename(old_file)))
+    print('Archived: ' + os.path.basename(old_file))
 
 # ── embed WINES array ─────────────────────────────────────────────────────────
 wines_json = json.dumps(wines, ensure_ascii=False, indent=2)
