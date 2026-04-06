@@ -7,5 +7,12 @@ OLD_wine_cellar_dashboard.html
 wine_collection.xlsx
 Archive/
 
+# Python
+.venv/
+__pycache__/
+
+# Environment
+.env
+
 # System
 .DS_Store
