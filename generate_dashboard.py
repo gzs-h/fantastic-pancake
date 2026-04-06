@@ -309,7 +309,8 @@ p.append("""  :root {
   ::-webkit-scrollbar{width:5px;height:5px}
   ::-webkit-scrollbar-track{background:var(--bg)}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-  @media(max-width:768px){.stat-grid{grid-template-columns:repeat(3,1fr)}.charts-grid{grid-template-columns:1fr}.nav-brand{display:none}}
+  .scan-fab{display:none}
+  @media(max-width:768px){.stat-grid{grid-template-columns:repeat(3,1fr)}.charts-grid{grid-template-columns:1fr}.nav-brand{display:none}.nav .edit-btn.scan-nav{display:none}.scan-fab{display:flex;position:fixed;bottom:24px;right:24px;z-index:200;width:56px;height:56px;border-radius:50%;background:var(--gold);color:var(--bg);font-size:24px;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.4);text-decoration:none;border:none;cursor:pointer}}
 """)
 p.append('</style>\n')
 p.append('</head>\n')
@@ -328,6 +329,7 @@ p.append('  <div class="theme-toggle" onclick="toggleTheme()" title="Toggle ligh
 p.append('    <span class="theme-toggle-label" id="themeLabel">Light</span>\n')
 p.append('    <div class="toggle-pill"><div class="toggle-knob" id="toggleKnob">&#9728;</div></div>\n')
 p.append('  </div>\n')
+p.append('  <a class="edit-btn scan-nav" href="/scan" style="text-decoration:none">&#128247;&nbsp;Scan Label</a>\n')
 p.append('  <button class="edit-btn" onclick="openDrawer()">&#9998;&nbsp;Edit</button>\n')
 p.append('</nav>\n\n')
 
@@ -908,6 +910,7 @@ function _dlBlob(filename, content, type) {
 """)
 
 p.append('</script>\n')
+p.append('<a class="scan-fab" href="/scan" title="Scan wine label">&#128247;</a>\n')
 p.append('</body>\n')
 p.append('</html>\n')
 
