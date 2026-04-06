@@ -1459,33 +1459,6 @@
     "drinkStatus": "now"
   },
   {
-    "id": 55,
-    "producer": "Altanuta",
-    "wine": "Pinot Grigio",
-    "appellation": "Vicenza DOC",
-    "country": "Italy",
-    "region": "Veneto",
-    "vintage": 2021,
-    "qty": 1,
-    "varietal": "Pinot Grigio",
-    "style": "white",
-    "purchasePrice": null,
-    "marketPrice": 20,
-    "score": 87,
-    "drinkFrom": 2022,
-    "drinkTo": 2026,
-    "drinkStatus": "urgent",
-    "pairings": [
-      "Seafood risotto",
-      "Grilled branzino",
-      "Fresh mozzarella"
-    ],
-    "summary": "Altanuta's Pinot Grigio from the Vicenza DOC sits in the eastern Veneto, where the variety produces crisp, mineral wines with stone fruit and a clean, dry finish. The 2021 vintage in the Veneto was warm and ripe. At five years old this is at the outer edge of its window — open soon.",
-    "purchasePriceEff": 20,
-    "qprRaw": 4.35,
-    "qprIndex": 8.0
-  },
-  {
     "id": 56,
     "producer": "Stags' Leap Winery",
     "wine": "125th Anniversary Cabernet Sauvignon",
