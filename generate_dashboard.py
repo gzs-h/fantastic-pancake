@@ -310,8 +310,24 @@ p.append("""  :root {
   ::-webkit-scrollbar-track{background:var(--bg)}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .scan-fab{display:none}
-  @media(max-width:768px){.stat-grid{grid-template-columns:repeat(3,1fr)}.charts-grid{grid-template-columns:1fr}.nav-brand{display:none}.nav .edit-btn.scan-nav{display:none}.scan-fab{display:flex;position:fixed;bottom:24px;right:24px;z-index:200;width:56px;height:56px;border-radius:50%;background:var(--gold);color:var(--bg);font-size:24px;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.4);text-decoration:none;border:none;cursor:pointer}}
+  @media(max-width:768px){.stat-grid{grid-template-columns:repeat(3,1fr)}.charts-grid{grid-template-columns:1fr}.nav-brand{display:none}.nav .edit-btn.scan-nav{display:none}.drawer{width:100%}.form-grid{grid-template-columns:1fr}.scan-fab{display:flex;position:fixed;bottom:24px;right:24px;z-index:200;width:56px;height:56px;border-radius:50%;background:var(--gold);color:var(--bg);font-size:24px;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.4);text-decoration:none;border:none;cursor:pointer}}
 """)
+p.append('  .scan-btn-full{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--gold);color:var(--gold);border-radius:6px;cursor:pointer;font-family:Georgia,serif;font-size:13px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s,opacity .2s;margin-bottom:6px}\n')
+p.append('  .scan-btn-full:hover{background:rgba(201,168,76,.08)}\n')
+p.append('  .scan-btn-full:disabled{border-color:var(--border);color:var(--muted);cursor:not-allowed;opacity:.5}\n')
+p.append('  .scan-status-line{font-size:11px;color:var(--muted);min-height:16px;margin:0 0 8px;text-align:center}\n')
+p.append('  .scan-status-line.ok{color:#4caf7a}\n')
+p.append('  .scan-status-line.err{color:#e07830}\n')
+p.append('  .key-area-inner{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px;margin-bottom:8px}\n')
+p.append('  .key-row{display:flex;gap:6px;align-items:center}\n')
+p.append('  .key-row input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px;font-family:Georgia,serif;outline:none}\n')
+p.append('  .key-row input:focus{border-color:var(--gold)}\n')
+p.append('  .scan-footer-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-size:11px}\n')
+p.append('  .key-link{color:var(--muted);cursor:pointer;text-decoration:underline;text-underline-offset:2px}\n')
+p.append('  .key-link:hover{color:var(--gold)}\n')
+p.append('  .scan-divider{border:none;border-top:1px solid var(--border);margin:0 0 14px}\n')
+p.append('  @keyframes _spin{to{transform:rotate(360deg)}}\n')
+p.append('  .spin{display:inline-block;width:11px;height:11px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:_spin .8s linear infinite;vertical-align:middle;margin-right:4px}\n')
 p.append('</style>\n')
 p.append('</head>\n')
 p.append('<body>\n')
@@ -329,7 +345,7 @@ p.append('  <div class="theme-toggle" onclick="toggleTheme()" title="Toggle ligh
 p.append('    <span class="theme-toggle-label" id="themeLabel">Light</span>\n')
 p.append('    <div class="toggle-pill"><div class="toggle-knob" id="toggleKnob">&#9728;</div></div>\n')
 p.append('  </div>\n')
-p.append('  <a class="edit-btn scan-nav" href="/scan" style="text-decoration:none">&#128247;&nbsp;Scan Label</a>\n')
+p.append('  <button class="edit-btn scan-nav" onclick="openScanDrawer()">&#128247;&nbsp;Scan Label</button>\n')
 p.append('  <button class="edit-btn" onclick="openDrawer()">&#9998;&nbsp;Edit</button>\n')
 p.append('</nav>\n\n')
 
@@ -465,6 +481,23 @@ p.append('      <input class="inv-search" type="text" id="invSearch" placeholder
 p.append('      <div class="inv-list" id="invList"></div>\n')
 p.append('    </div>\n')
 p.append('    <div class="drawer-panel" id="panel-add">\n')
+p.append('      <button class="scan-btn-full" id="scanBtn" onclick="scanLabel()">&#128247;&nbsp;Scan Label</button>\n')
+p.append('      <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none" onchange="handleScanFile(this)">\n')
+p.append('      <div class="scan-status-line" id="scanStatus"></div>\n')
+p.append('      <div id="keyArea" style="display:none">\n')
+p.append('        <div class="key-area-inner">\n')
+p.append('          <div class="key-row">\n')
+p.append('            <input type="password" id="keyInput" placeholder="Paste Gemini API key\u2026">\n')
+p.append('            <button class="btn-secondary" onclick="saveKey()" style="padding:5px 10px;font-size:11px">Save</button>\n')
+p.append('            <button class="btn-secondary" onclick="clearKey()" style="padding:5px 10px;font-size:11px;color:#e05050">Clear</button>\n')
+p.append('          </div>\n')
+p.append('        </div>\n')
+p.append('      </div>\n')
+p.append('      <div class="scan-footer-row">\n')
+p.append('        <span id="keyStatusLine" style="color:var(--muted)">\u2014</span>\n')
+p.append('        <span class="key-link" onclick="toggleKeyArea()">&#9881;&nbsp;API key</span>\n')
+p.append('      </div>\n')
+p.append('      <hr class="scan-divider">\n')
 p.append('      <div class="form-grid">\n')
 p.append('        <div class="form-group"><label>Producer *</label><input type="text" id="f-producer" placeholder="e.g. Domaine Leflaive"></div>\n')
 p.append('        <div class="form-group"><label>Wine Name *</label><input type="text" id="f-wine" placeholder="e.g. Puligny-Montrachet"></div>\n')
@@ -739,6 +772,7 @@ function switchEditTab(tab, el) {
   document.getElementById("panel-" + tab).classList.add("active");
   if (tab === "inventory") renderInvList();
   if (tab === "export") renderChangeLog();
+  if (tab === "add") _updateKeyStatus();
 }
 function renderInvList() {
   var q = (document.getElementById("invSearch").value || "").toLowerCase();
@@ -821,10 +855,12 @@ function addWine() {
     varietal: varietal, style: style,
     purchasePrice: purchasePrice, marketPrice: marketPrice || purchasePrice || 0,
     score: score, drinkFrom: drinkFrom, drinkTo: drinkTo, drinkStatus: drinkStatus,
-    pairings: ["Pending enrichment"],
-    summary: "Added manually \u2014 bring this file to Claude to complete tasting notes, pairings, and vintage context.",
-    purchasePriceEff: purchasePriceEff, qprRaw: score / purchasePriceEff, qprIndex: 5, pending: true
+    pairings: (window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length) ? window._scanPending.pairings : ["Pending enrichment"],
+    summary: (window._scanPending && window._scanPending.summary) ? window._scanPending.summary : "Added manually \u2014 bring this file to Claude to complete tasting notes, pairings, and vintage context.",
+    purchasePriceEff: purchasePriceEff, qprRaw: score / purchasePriceEff, qprIndex: 5,
+    pending: !(window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length)
   });
+  window._scanPending = null;
   _recomputeQPR();
   _logChange("+ Added: " + producer + " \u2014 " + wine
     + " (" + (typeof vintage === "string" ? "NV" : vintage) + ") \u00d7" + qty);
@@ -838,6 +874,9 @@ function clearAddForm() {
   ["f-country","f-style"].forEach(function(id){document.getElementById(id).value="";});
   ["f-vintage","f-purchase","f-market","f-score","f-from","f-to"].forEach(function(id){document.getElementById(id).value="";});
   document.getElementById("f-qty").value = "1";
+  window._scanPending = null;
+  var ss = document.getElementById("scanStatus");
+  if (ss) { ss.className = "scan-status-line"; ss.textContent = ""; }
 }
 function _recomputeQPR() {
   var raws = WINES.map(function(w){return w.score / (w.purchasePriceEff || 25);});
@@ -909,8 +948,134 @@ function _dlBlob(filename, content, type) {
 }
 """)
 
+p.append("""
+// \u2500\u2500 SCAN LABEL (client-side Gemini Vision)
+window._scanPending = null;
+
+function _scanKey() {
+  try { return localStorage.getItem('gemini_api_key') || ''; } catch(e) { return ''; }
+}
+function _updateKeyStatus() {
+  var k = _scanKey();
+  var el = document.getElementById('keyStatusLine');
+  var btn = document.getElementById('scanBtn');
+  if (el) { el.textContent = k ? '\u2713 API key set' : 'No API key'; el.style.color = k ? '#4caf7a' : 'var(--muted)'; }
+  if (btn) btn.disabled = !k;
+}
+function toggleKeyArea() {
+  var el = document.getElementById('keyArea');
+  if (!el) return;
+  var showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (!showing) { var ki = document.getElementById('keyInput'); if (ki) ki.focus(); }
+}
+function saveKey() {
+  var val = (document.getElementById('keyInput') || {}).value || '';
+  val = val.trim();
+  if (!val) return;
+  try { localStorage.setItem('gemini_api_key', val); } catch(e) {}
+  document.getElementById('keyInput').value = '';
+  document.getElementById('keyArea').style.display = 'none';
+  _updateKeyStatus();
+}
+function clearKey() {
+  try { localStorage.removeItem('gemini_api_key'); } catch(e) {}
+  var ki = document.getElementById('keyInput');
+  if (ki) ki.value = '';
+  _updateKeyStatus();
+}
+function scanLabel() {
+  var k = _scanKey();
+  if (!k) {
+    toggleKeyArea();
+    var ss = document.getElementById('scanStatus');
+    if (ss) { ss.className = 'scan-status-line err'; ss.textContent = 'Set your Gemini API key first.'; }
+    return;
+  }
+  var inp = document.getElementById('scanInput');
+  if (inp) inp.click();
+}
+function handleScanFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var status = document.getElementById('scanStatus');
+  var btn = document.getElementById('scanBtn');
+  status.className = 'scan-status-line';
+  status.innerHTML = '<span class="spin"></span> Identifying wine\u2026';
+  btn.disabled = true;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result.split(',')[1];
+    var mime = file.type || 'image/jpeg';
+    _callGeminiVision(b64, mime, status, btn);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+function _callGeminiVision(b64, mime, status, btn) {
+  var key = _scanKey();
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key;
+  var prompt = 'You are a wine expert examining a wine bottle label photo.\\n\\nExtract every detail you can identify from the label. Then, using your wine knowledge, fill in the remaining fields needed for a wine cellar database.\\n\\nReturn ONLY a JSON object with these exact fields (no markdown, no explanation):\\n{"producer":"...","wine":"...","appellation":"...","country":"...","region":"...","vintage":2023,"varietal":"...","style":"red","purchasePrice":null,"marketPrice":25,"score":88,"drinkFrom":2024,"drinkTo":2030,"pairings":["food1","food2","food3"],"summary":"2-3 sentence tasting note and context."}\\n\\nRules:\\n- vintage must be an integer year, or the string NV for non-vintage\\n- style must be one of: red, white, sparkling, ros\\u00e9, dessert, orange\\n- marketPrice is your best estimate of current US retail price in USD\\n- score is your best estimate of critic consensus (Wine Advocate, Wine Spectator)\\n- drinkFrom and drinkTo are drinking window years\\n- pairings should be 3 specific food pairings\\n- summary should mention the producer, vintage character, and what to expect\\n- purchasePrice should always be null\\n- If you cannot identify the wine at all, set producer to null';
+  var body = JSON.stringify({ contents: [{ parts: [
+    { inline_data: { mime_type: mime, data: b64 } },
+    { text: prompt }
+  ]}]});
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) throw new Error(data.error.message || 'API error');
+      var candidates = data.candidates || [];
+      var content = (candidates[0] || {}).content || {};
+      var parts = content.parts || [];
+      var text = ((parts[0] || {}).text || '').trim();
+      if (text.indexOf('```') === 0) {
+        text = text.split('\\n').slice(1).join('\\n');
+        text = text.replace(/```\\s*$/, '').trim();
+      }
+      var wine = JSON.parse(text);
+      if (!wine.producer) throw new Error('Could not identify wine from this image');
+      _fillFormFromScan(wine);
+      status.className = 'scan-status-line ok';
+      status.textContent = '\u2713 Wine identified \u2014 review fields below, then click Add to Collection';
+      btn.disabled = false;
+    })
+    .catch(function(err) {
+      status.className = 'scan-status-line err';
+      status.textContent = 'Scan failed: ' + err.message;
+      btn.disabled = false;
+    });
+}
+function _fillFormFromScan(w) {
+  function setVal(id, val) { var el = document.getElementById(id); if (el && val != null) el.value = val; }
+  setVal('f-producer', w.producer || '');
+  setVal('f-wine', w.wine || '');
+  setVal('f-appellation', w.appellation || '');
+  setVal('f-varietal', w.varietal || '');
+  setVal('f-region', w.region || '');
+  setVal('f-vintage', typeof w.vintage === 'number' ? w.vintage : '');
+  setVal('f-market', w.marketPrice || '');
+  setVal('f-score', w.score || '');
+  setVal('f-from', w.drinkFrom || '');
+  setVal('f-to', w.drinkTo || '');
+  var cEl = document.getElementById('f-country');
+  if (cEl && w.country) {
+    for (var i = 0; i < cEl.options.length; i++) {
+      if (cEl.options[i].value === w.country || cEl.options[i].text === w.country) { cEl.selectedIndex = i; break; }
+    }
+  }
+  var sEl = document.getElementById('f-style');
+  if (sEl && w.style) sEl.value = w.style;
+  window._scanPending = { pairings: w.pairings || [], summary: w.summary || '' };
+}
+function openScanDrawer() {
+  openDrawer();
+  var tabs = document.querySelectorAll('.drawer-tab');
+  if (tabs[1]) switchEditTab('add', tabs[1]);
+}
+_updateKeyStatus();
+""")
 p.append('</script>\n')
-p.append('<a class="scan-fab" href="/scan" title="Scan wine label">&#128247;</a>\n')
+p.append('<button class="scan-fab" onclick="openScanDrawer()" title="Scan wine label">&#128247;</button>\n')
 p.append('</body>\n')
 p.append('</html>\n')
 

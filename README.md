@@ -58,6 +58,49 @@ Each wine in `wines.json` has the following fields:
 
 `qprRaw`, `qprIndex`, and `drinkStatus` are computed — recalculate across the full collection whenever wines are added, edited, or removed.
 
+## Setup
+
+### Static dashboard (no server needed)
+
+No installation required. Just run the generator and open the HTML in a browser:
+
+```bash
+python3 generate_dashboard.py
+open "YYYYMMDD_Wine Cellar Dashboard.html"
+```
+
+### Label scanner (optional)
+
+The label scanner (`server.py`) lets you photograph a bottle and add it to the collection automatically. It requires a Gemini API key and two Python packages.
+
+**1. Install dependencies**
+
+```bash
+pip3 install flask google-genai
+```
+
+**2. Get a Gemini API key**
+
+Create one at [aistudio.google.com](https://aistudio.google.com). Free tier is sufficient.
+
+**3. Run the server**
+
+```bash
+GEMINI_API_KEY=your_key_here python3 server.py
+```
+
+The dashboard is served at `http://localhost:8086` and the scan UI at `http://localhost:8086/scan`. Open the scan URL on your phone (must be on the same network) to photograph labels.
+
+**Optional env vars:**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | required | Gemini API key |
+| `PORT` | `8086` | Server port |
+| `SCAN_SECRET` | _(none)_ | Shared secret to restrict scan access |
+
+---
+
 ## Workflow
 
 **Adding a wine:** edit `wines.json`, recompute QPR fields and `drinkStatus`, run the generator.
