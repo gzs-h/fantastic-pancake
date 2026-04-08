@@ -1014,7 +1014,7 @@ function handleScanFile(input) {
 }
 function _callGeminiVision(b64, mime, status, btn) {
   var key = _scanKey();
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemma-4-27b-it:generateContent?key=' + key;
   var prompt = 'You are a wine expert examining a wine bottle label photo.\\n\\nExtract every detail you can identify from the label. Then, using your wine knowledge, fill in the remaining fields needed for a wine cellar database.\\n\\nReturn ONLY a JSON object with these exact fields (no markdown, no explanation):\\n{"producer":"...","wine":"...","appellation":"...","country":"...","region":"...","vintage":2023,"varietal":"...","style":"red","purchasePrice":null,"marketPrice":25,"score":88,"drinkFrom":2024,"drinkTo":2030,"pairings":["food1","food2","food3"],"summary":"2-3 sentence tasting note and context."}\\n\\nRules:\\n- vintage must be an integer year, or the string NV for non-vintage\\n- style must be one of: red, white, sparkling, ros\\u00e9, dessert, orange\\n- marketPrice is your best estimate of current US retail price in USD\\n- score is your best estimate of critic consensus (Wine Advocate, Wine Spectator)\\n- drinkFrom and drinkTo are drinking window years\\n- pairings should be 3 specific food pairings\\n- summary should mention the producer, vintage character, and what to expect\\n- purchasePrice should always be null\\n- If you cannot identify the wine at all, set producer to null';
   var body = JSON.stringify({ contents: [{ parts: [
     { inline_data: { mime_type: mime, data: b64 } },
