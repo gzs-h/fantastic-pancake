@@ -22,7 +22,7 @@
     ],
     "summary": "Reliable Napa Cabernet from a longtime Rutherford estate. The 2018 vintage was warm and dry, yielding ripe, full-bodied reds. Drinking well now and purchased at a fraction of market — solid everyday cellar stock; use up by 2028.",
     "purchasePriceEff": 18,
-    "qprRaw": 4.833333333333333,
+    "qprRaw": 4.8333,
     "qprIndex": 8.8,
     "drinkStatus": "now"
   },
@@ -49,7 +49,7 @@
     ],
     "summary": "Vieilles vignes Pinot Noir from Marsannay, the northern gateway to the Côte de Nuits. Collotte is a quality-focused domaine producing honest village Burgundy. The warm 2023 vintage produced plush, approachable wines — drink from 2025 onward.",
     "purchasePriceEff": 30,
-    "qprRaw": 2.966666666666667,
+    "qprRaw": 2.9667,
     "qprIndex": 5.5,
     "drinkStatus": "now"
   },
@@ -76,7 +76,7 @@
     ],
     "summary": "Fixin sits just south of Marsannay; 'crais de chêne' refers to the chalky soils that give structure and minerality. Collotte's 2023 is generous and immediately likeable. A reliable appellation wine that rewards patience to 2032.",
     "purchasePriceEff": 32,
-    "qprRaw": 2.78125,
+    "qprRaw": 2.7812,
     "qprIndex": 5.2,
     "drinkStatus": "now"
   },
@@ -130,7 +130,7 @@
     ],
     "summary": "Utah-based Château la Caille sources from Washington's Columbia Valley for this Bordeaux-inspired blend of Cab Franc, Merlot, Malbec, and Cab Sauv. The 2021 Columbia Valley vintage was excellent. An approachable proprietary red in a good drinking window now.",
     "purchasePriceEff": 35,
-    "qprRaw": 2.5142857142857142,
+    "qprRaw": 2.5143,
     "qprIndex": 4.7,
     "drinkStatus": "now"
   },
@@ -157,7 +157,7 @@
     ],
     "summary": "Concha y Toro's flagship single-vineyard Cabernet has been Chile's benchmark for four decades. The 2020 vintage was exceptional across Maipo Valley — arguably a decade highlight. Purchased at $18 vs. $150 market: the standout QPR bottle in this cellar.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.333333333333333,
+    "qprRaw": 5.3333,
     "qprIndex": 9.7,
     "drinkStatus": "now"
   },
@@ -184,7 +184,7 @@
     ],
     "summary": "RunRig is one of Australia's most celebrated wines — old-vine Barossa Shiraz co-fermented with Viognier, aged 30 months in French oak. The 2020 earned 97 points. Purchased at $18 vs. $244 market: the greatest QPR bottle in this cellar. Do not open before 2026.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.388888888888889,
+    "qprRaw": 5.3889,
     "qprIndex": 9.8,
     "drinkStatus": "now"
   },
@@ -211,7 +211,7 @@
     ],
     "summary": "Il Bosco is Cesari's single-vineyard Amarone from dried Corvina, Corvinone, and Rondinella grapes — a wine of great concentration and warmth. The 2018 Amarone vintage was rich and generous. Drinking well from 2023 through 2035 at an exceptional purchase price.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.055555555555555,
+    "qprRaw": 5.0556,
     "qprIndex": 9.2,
     "drinkStatus": "now"
   },
@@ -238,7 +238,7 @@
     ],
     "summary": "Gran Selezione is Chianti Classico's apex designation — single-vineyard Sangiovese aged minimum 30 months. Lamole di Lamole sits at high elevation in the Greve sub-zone, producing taut, mineral wines. The 2020 vintage was stellar. A genuine bargain at purchase price.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.111111111111111,
+    "qprRaw": 5.1111,
     "qprIndex": 9.3,
     "drinkStatus": "now"
   },
@@ -265,7 +265,7 @@
     ],
     "summary": "Bolgheri Superiore sits at the heart of the Super Tuscan world on Tuscany's Maremma coast. Campo Al Mare's Baia al Vento is a structured Bordeaux blend from this prestigious coastal appellation. The 2020 vintage delivered excellent balance. Drink 2024–2033.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.055555555555555,
+    "qprRaw": 5.0556,
     "qprIndex": 9.2,
     "drinkStatus": "now"
   },
@@ -292,7 +292,7 @@
     ],
     "summary": "Kirkland's Saint-Émilion Grand Cru is consistently among the best-value Bordeaux on the market, typically sourced from classified châteaux under the Kirkland label. The 2022 Bordeaux vintage was outstanding — one of the decade's best. Drink from 2025.",
     "purchasePriceEff": 28,
-    "qprRaw": 3.1785714285714284,
+    "qprRaw": 3.1786,
     "qprIndex": 5.9,
     "drinkStatus": "now"
   },
@@ -321,7 +321,7 @@
     "purchasePriceEff": 32,
     "qprRaw": 2.8125,
     "qprIndex": 5.2,
-    "drinkStatus": "soon"
+    "drinkStatus": "early"
   },
   {
     "id": 13,
@@ -348,7 +348,7 @@
     "purchasePriceEff": 120,
     "qprRaw": 0.775,
     "qprIndex": 1.6,
-    "drinkStatus": "past"
+    "drinkStatus": "late"
   },
   {
     "id": 14,
@@ -373,7 +373,7 @@
     ],
     "summary": "Chassagne-Montrachet is best known for white Burgundy, but its Pinot Noir produces elegant, silky village red at a fraction of the appellation's white wine prices. Bichot's village rouge is aged 14–16 months in French oak. The rich 2022 vintage delivered excellent depth of fruit. Drinking well now through 2032 — and at $18 paid vs. $45 market, a strong value play within the RNDC library.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.055555555555555,
+    "qprRaw": 5.0556,
     "qprIndex": 9.2,
     "drinkStatus": "now"
   },
@@ -400,7 +400,7 @@
     ],
     "summary": "Château Gris is Albert Bichot's Monopole — sole ownership — of an 8.5-acre walled Premier Cru vineyard south-west of Nuits-Saint-Georges, planted on terraced slopes between 260–330m. The Pinot Noir here is the classified 1er cru wine (the Chardonnay on site does not carry Premier Cru status). Expect the elegance of NSG — red and black fruit, violet, subtle oak — with serious aging potential. Give it at least 2026.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.166666666666667,
+    "qprRaw": 5.1667,
     "qprIndex": 9.4,
     "drinkStatus": "now"
   },
@@ -412,7 +412,7 @@
     "country": "France",
     "region": "Beaujolais",
     "vintage": 2023,
-    "qty": 2,
+    "qty": 1,
     "varietal": "Gamay",
     "style": "red",
     "purchasePrice": 16,
@@ -429,7 +429,7 @@
     "purchasePriceEff": 16,
     "qprRaw": 5.5,
     "qprIndex": 10.0,
-    "drinkStatus": "urgent"
+    "drinkStatus": "now"
   },
   {
     "id": 17,
@@ -482,7 +482,7 @@
     ],
     "summary": "Sablet is a Côtes du Rhône Villages commune near Gigondas producing structured GSM blends with garrigue and dark fruit. Domaine de Pasquiers is a reliable producer. The 2020 southern Rhône vintage was excellent. Drinking well now through 2028.",
     "purchasePriceEff": 22,
-    "qprRaw": 4.045454545454546,
+    "qprRaw": 4.0455,
     "qprIndex": 7.4,
     "drinkStatus": "now"
   },
@@ -509,7 +509,7 @@
     ],
     "summary": "Chermette's 'Pierreux' (rocky) Brouilly comes from blue volcanic granite soils, producing Gamay of unusual density and mineral character. Brouilly is the largest of the ten Beaujolais crus. The warm 2022 vintage gives real structure; can age nicely to 2029.",
     "purchasePriceEff": 22,
-    "qprRaw": 4.136363636363637,
+    "qprRaw": 4.1364,
     "qprIndex": 7.6,
     "drinkStatus": "now"
   },
@@ -536,7 +536,7 @@
     ],
     "summary": "Hiyu Wine Farm operates biodynamically in the Columbia Gorge, crafting the Pacific Northwest's most idiosyncratic wines. Clochain is a single field planted to a wild mix of southern European varieties. Earthy, complex, and unlike anything else in this cellar. A genuine conversation piece.",
     "purchasePriceEff": 55,
-    "qprRaw": 1.6363636363636365,
+    "qprRaw": 1.6364,
     "qprIndex": 3.1,
     "drinkStatus": "now"
   },
@@ -563,7 +563,7 @@
     ],
     "summary": "Patagonia's cool, wind-swept vineyards produce Cabernet Sauvignon with freshness rarely found in warmer Argentine regions. Malma/Chacra is associated with the Incisa della Rocchetta family of Sassicaia fame. The 2024 is very young — give it a couple of years before opening.",
     "purchasePriceEff": 35,
-    "qprRaw": 2.5714285714285716,
+    "qprRaw": 2.5714,
     "qprIndex": 4.8,
     "drinkStatus": "now"
   },
@@ -590,9 +590,9 @@
     ],
     "summary": "Chapelle-Chambertin is a Grand Cru appellation in Gevrey-Chambertin. The 2004 Burgundy vintage was underrated but produced wines with real structure. At 22 years old and purchased for just $18, this wine is at or past its window. Open immediately — complexity is fading, not building.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.055555555555555,
+    "qprRaw": 5.0556,
     "qprIndex": 9.2,
-    "drinkStatus": "past"
+    "drinkStatus": "late"
   },
   {
     "id": 23,
@@ -617,9 +617,9 @@
     ],
     "summary": "Krontiras makes 'Cosmic Amber' as a skin-contact Torrontés — Argentina's aromatic white variety given the orange wine treatment. The result is textured, tannic, and savory with characteristic floral lift. Drink within a few years of release; these styles don't benefit from extended cellaring.",
     "purchasePriceEff": 30,
-    "qprRaw": 2.966666666666667,
+    "qprRaw": 2.9667,
     "qprIndex": 5.5,
-    "drinkStatus": "urgent"
+    "drinkStatus": "now"
   },
   {
     "id": 24,
@@ -671,35 +671,8 @@
     ],
     "summary": "Domaine Labet is one of Jura's most acclaimed estates, farming biodynamically on the Revermont hillsides. 'Cuvée du Hasard' (cuvée of chance) is old-vine Chardonnay of extraordinary precision. The 2018 is drinking beautifully now — a genuinely special bottle for the adventurous palate.",
     "purchasePriceEff": 55,
-    "qprRaw": 1.6727272727272726,
+    "qprRaw": 1.6727,
     "qprIndex": 3.2,
-    "drinkStatus": "now"
-  },
-  {
-    "id": 26,
-    "producer": "François Chidaine",
-    "wine": "Les Bournais",
-    "appellation": "Montlouis-sur-Loire",
-    "country": "France",
-    "region": "Loire Valley",
-    "vintage": 2019,
-    "qty": 1,
-    "varietal": "Chenin Blanc",
-    "style": "white",
-    "purchasePrice": null,
-    "marketPrice": 30,
-    "score": 91,
-    "drinkFrom": 2022,
-    "drinkTo": 2032,
-    "pairings": [
-      "River fish",
-      "Pork rillettes",
-      "Soft goat cheese"
-    ],
-    "summary": "Montlouis-sur-Loire faces Vouvray across the river, producing equally compelling Chenin Blanc at a fraction of the fame. François Chidaine is the benchmark producer of the appellation. 'Les Bournais' is dry, taut, and mineral. The 2019 vintage gave excellent concentration; drink through 2032.",
-    "purchasePriceEff": 30,
-    "qprRaw": 3.033333333333333,
-    "qprIndex": 5.6,
     "drinkStatus": "now"
   },
   {
@@ -752,7 +725,7 @@
     ],
     "summary": "Weingut Keller is widely considered Germany's greatest producer. Their Alte Reben ('Old Vines') Silvaner showcases what this underrated grape can achieve — mineral tension, earthy depth, and real complexity from limestone-rich Rheinhessen soils. A cellar standout for the curious drinker.",
     "purchasePriceEff": 55,
-    "qprRaw": 1.6727272727272726,
+    "qprRaw": 1.6727,
     "qprIndex": 3.2,
     "drinkStatus": "now"
   },
@@ -808,7 +781,7 @@
     "purchasePriceEff": 50,
     "qprRaw": 1.8,
     "qprIndex": 3.4,
-    "drinkStatus": "urgent"
+    "drinkStatus": "now"
   },
   {
     "id": 31,
@@ -860,9 +833,9 @@
     ],
     "summary": "Bugey Cerdon is a méthode ancestrale sweet sparkling wine from the Ain département, made from Gamay and Poulsard. Lightly sweet, deeply pink, and bursting with fresh raspberry fruit. A charming, unique wine — drink young and cold. Do not cellar this.",
     "purchasePriceEff": 22,
-    "qprRaw": 4.045454545454546,
+    "qprRaw": 4.0455,
     "qprIndex": 7.4,
-    "drinkStatus": "urgent"
+    "drinkStatus": "now"
   },
   {
     "id": 33,
@@ -914,9 +887,9 @@
     ],
     "summary": "Tarlant is a highly regarded grower Champagne house, and L'Aérienne Rosé is a prestige vintage cuvée. At 22 years old, the mousse will have softened but the complexity gains are profound — dried fruits, toast, oxidative depth. If stored properly, a genuinely extraordinary drinking experience.",
     "purchasePriceEff": 120,
-    "qprRaw": 0.7666666666666667,
+    "qprRaw": 0.7667,
     "qprIndex": 1.6,
-    "drinkStatus": "urgent"
+    "drinkStatus": "now"
   },
   {
     "id": 35,
@@ -968,7 +941,7 @@
     ],
     "summary": "Domaine Carneros is Taittinger's California joint venture, producing traditionally-made sparkling wines in the cool Carneros district. The Blanc de Noir is all Pinot Noir — pink-tinged, creamy, and delicious. Drink this non-vintage wine within the next few years for maximum freshness.",
     "purchasePriceEff": 38,
-    "qprRaw": 2.3684210526315788,
+    "qprRaw": 2.3684,
     "qprIndex": 4.4,
     "drinkStatus": "now"
   },
@@ -995,7 +968,7 @@
     ],
     "summary": "The 2021 Brut Rosé is one of Domaine Carneros's most popular cuvées — elegant Pinot-driven sparkling wine from the cool Carneros AVA. The 2021 California vintage was pristine and focused. Drinking beautifully now through 2030.",
     "purchasePriceEff": 45,
-    "qprRaw": 2.022222222222222,
+    "qprRaw": 2.0222,
     "qprIndex": 3.8,
     "drinkStatus": "now"
   },
@@ -1049,7 +1022,7 @@
     ],
     "summary": "Ashes & Diamonds is one of Napa's most thoughtful producers, making mid-weight wines with French sensibility. Cabernet Franc 10 is floral, herbaceous, and structured — a stylistically distinctive Napa bottle. The 2023 vintage delivered freshness and elegance. Give it a year or two.",
     "purchasePriceEff": 75,
-    "qprRaw": 1.2266666666666666,
+    "qprRaw": 1.2267,
     "qprIndex": 2.4,
     "drinkStatus": "now"
   },
@@ -1103,7 +1076,7 @@
     ],
     "summary": "The 2019 Winberrie Knolls is the more mature expression of Hartford's Zinfandel program — now in a lovely drinking window with integrated fruit and emerging complexity. The 2019 California vintage showed excellent balance. Open this before the 2023; it's ready now.",
     "purchasePriceEff": 60,
-    "qprRaw": 1.5333333333333334,
+    "qprRaw": 1.5333,
     "qprIndex": 3.0,
     "drinkStatus": "now"
   },
@@ -1130,9 +1103,9 @@
     ],
     "summary": "Nickel & Nickel specializes in single-vineyard, unblended Cabernet Sauvignons. Branding Iron Vineyard in Oakville delivers concentrated, structured Cab with impressive aging potential. Note: your spreadsheet lists 'Braining Iron' — almost certainly a typo for 'Branding Iron.' Needs 3–5 years.",
     "purchasePriceEff": 123,
-    "qprRaw": 0.7642276422764228,
+    "qprRaw": 0.7642,
     "qprIndex": 1.6,
-    "drinkStatus": "soon"
+    "drinkStatus": "early"
   },
   {
     "id": 43,
@@ -1157,7 +1130,7 @@
     ],
     "summary": "Heitz Cellar is one of Napa's most storied estates. Trailside Vineyard in Rutherford produces elegant, classic Cabernet with the appellation's signature dusty tannins and dark fruit. The 2019 vintage was exceptional throughout Napa — superb balance and aging potential. Entering its window now.",
     "purchasePriceEff": 63,
-    "qprRaw": 1.4761904761904763,
+    "qprRaw": 1.4762,
     "qprIndex": 2.9,
     "drinkStatus": "now"
   },
@@ -1184,7 +1157,7 @@
     ],
     "summary": "Martha's Vineyard is arguably Napa Valley's most historically important wine — the benchmark California Cabernet since the 1960s, known for its signature eucalyptus character. The 2019 is exceptional and will peak around 2030–2035. One of the cellar's true icons; handle with care.",
     "purchasePriceEff": 223,
-    "qprRaw": 0.4349775784753363,
+    "qprRaw": 0.435,
     "qprIndex": 1.0,
     "drinkStatus": "now"
   },
@@ -1211,7 +1184,7 @@
     ],
     "summary": "Le Diamant is Vérité Estate's inaugural white wine — 100% Sauvignon Blanc from high-elevation volcanic micro-crus in Sonoma, inspired by Pessac-Léognan. A serious, age-worthy white in the Haut-Brion Blanc tradition. Three bottles at $175 market makes this the cellar's single largest white wine holding.",
     "purchasePriceEff": 175,
-    "qprRaw": 0.5428571428571428,
+    "qprRaw": 0.5429,
     "qprIndex": 1.2,
     "drinkStatus": "now"
   },
@@ -1238,7 +1211,7 @@
     ],
     "summary": "Littorai's Vin Gris is a pale, dry rosé pressed directly from Pinot Noir — no skin contact, pure and delicate. Ted Lemon's biodynamic Sonoma Coast vineyards produce bright, mineral fruit. The 2025 is the newest wine in the cellar; drink within a year or two of release.",
     "purchasePriceEff": 38,
-    "qprRaw": 2.3947368421052633,
+    "qprRaw": 2.3947,
     "qprIndex": 4.5,
     "drinkStatus": "now"
   },
@@ -1265,7 +1238,7 @@
     ],
     "summary": "Littorai's Haven Chenin Blanc is one of California's most compelling examples of the variety — made by Ted Lemon, whose formative years were spent in the Loire Valley. Waxy, textured, and mineral with extraordinary longevity potential. A unique and important wine for the California white wine canon.",
     "purchasePriceEff": 60,
-    "qprRaw": 1.5333333333333334,
+    "qprRaw": 1.5333,
     "qprIndex": 3.0,
     "drinkStatus": "now"
   },
@@ -1292,7 +1265,7 @@
     ],
     "summary": "Littorai's Sonoma Coast Chardonnay draws from multiple biodynamic vineyards across the appellation for a complex, terroir-driven blend. Ted Lemon trained under Guy Roulot in Burgundy, and that influence is unmistakable. The 2024 is very young; give it 18 months before opening.",
     "purchasePriceEff": 70,
-    "qprRaw": 1.3285714285714285,
+    "qprRaw": 1.3286,
     "qprIndex": 2.6,
     "drinkStatus": "now"
   },
@@ -1319,7 +1292,7 @@
     ],
     "summary": "B.A. Theriot is one of Littorai's most celebrated single-vineyard Chardonnays, grown on marine-sediment soils of the Sonoma Coast. Complex, mineral, and built for aging — Littorai at its most ambitious. The 2023 vintage was excellent; give it 2–3 more years before opening.",
     "purchasePriceEff": 85,
-    "qprRaw": 1.1058823529411765,
+    "qprRaw": 1.1059,
     "qprIndex": 2.2,
     "drinkStatus": "now"
   },
@@ -1373,7 +1346,7 @@
     ],
     "summary": "Pivot is Littorai's estate vineyard on the Sonoma Coast, farmed biodynamically by Ted Lemon. A benchmark site for cool-climate Pinot Noir — savory, mineral, and structured with remarkable depth. The 2023 is young and tightly wound; patience will be rewarded. Do not open before 2026.",
     "purchasePriceEff": 105,
-    "qprRaw": 0.8952380952380953,
+    "qprRaw": 0.8952,
     "qprIndex": 1.8,
     "drinkStatus": "now"
   },
@@ -1427,9 +1400,9 @@
     ],
     "summary": "Tortoniano is Michele Chiarlo's entry-level Barolo — Nebbiolo from the Serralunga d'Alba sub-zone, known for its powerful, austere style. The 2021 Barolo vintage was exceptional. Purchased at $18 vs. $50 market — but Barolo is not a short-term play. Cellar until at least 2027.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.111111111111111,
+    "qprRaw": 5.1111,
     "qprIndex": 9.3,
-    "drinkStatus": "soon"
+    "drinkStatus": "early"
   },
   {
     "id": 54,
@@ -1454,7 +1427,7 @@
     ],
     "summary": "Elivette is Spring Mountain Vineyard's flagship Bordeaux blend from their historic estate above St. Helena. At 25 years old in a 3-liter format (which aids longevity), this is a rare and important bottle. The 2001 scored 91 points and is approaching the outer edge of its window — open this year.",
     "purchasePriceEff": 199,
-    "qprRaw": 0.457286432160804,
+    "qprRaw": 0.4573,
     "qprIndex": 1.0,
     "drinkStatus": "now"
   },
@@ -1482,7 +1455,7 @@
     ],
     "summary": "A commemorative bottling of Stags' Leap Winery's 125th anniversary — a Cabernet-dominant Bordeaux blend (81% Cab Sauv, 11% Merlot, 4% Malbec, 2% Tannat, 2% Petit Verdot) from Napa's exceptional 2018 vintage. Rated 95 by James Suckling. Purchased at $18 vs. $58 market: one of the stronger QPR bottles in the RNDC library cohort. Drinking well now.",
     "purchasePriceEff": 18,
-    "qprRaw": 5.277777777777778,
+    "qprRaw": 5.2778,
     "qprIndex": 9.6
   },
   {
@@ -1510,7 +1483,7 @@
     ],
     "summary": "Clos Cibonne is the undisputed master of Tibouren, the rare Provençal grape that gives the Cuvée Tradition its entirely singular character. Aged for one year in 120-year-old, 5,000-litre foudres under fleurette, it offers lychee, orange blossom, garrigue, and a saline, phenolic richness utterly unlike any other rosé. The 2023 scored 90 points. A Cru Classé estate and one of the benchmark addresses in Provence — this will continue to develop through 2031.",
     "purchasePriceEff": 44,
-    "qprRaw": 2.0454545454545454,
+    "qprRaw": 2.0455,
     "qprIndex": 3.9
   }
 ]
