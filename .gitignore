@@ -6,6 +6,7 @@ Updated_Wine Cellar Dashboard.html
 OLD_wine_cellar_dashboard.html
 wine_collection.xlsx
 Archive/
+*.bak
 
 # Python
 .venv/
