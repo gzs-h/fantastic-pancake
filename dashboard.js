@@ -10,6 +10,25 @@ function show(id, el) {
   if (id === 'history') renderHistory();
 }
 
+// ── DERIVED FIELDS ──────────────────────────────────────────────────────────
+// Per-wine derived fields (drinkStatus, qprRaw, qprIndex, purchasePriceEff)
+// are computed in the browser. This is the single source of truth for the
+// derivation rules. The Python build step embeds raw data; recomputeDerivedFields()
+// overwrites stale values before anything renders.
+function _computeDrinkStatus(w) {
+  var df = w.drinkFrom, dt = w.drinkTo;
+  if (!df || !dt) return w.drinkStatus || 'wait';
+  if (dt < CY) return 'past';
+  if (df <= CY) return (dt === CY) ? 'urgent' : 'now';
+  if (df <= CY + 2) return 'soon';
+  return 'wait';
+}
+function recomputeDerivedFields() {
+  WINES.forEach(function(w) { w.drinkStatus = _computeDrinkStatus(w); });
+  if (typeof _recomputeQPR === 'function') _recomputeQPR();
+}
+recomputeDerivedFields();
+
 // CHARTS
 let _charts = {};
 function buildCharts() {
@@ -328,11 +347,6 @@ function addWine() {
   var drinkFrom = parseInt(document.getElementById("f-from").value) || CY;
   var drinkTo = parseInt(document.getElementById("f-to").value) || (CY + 5);
   var purchasePriceEff = purchasePrice || null;
-  var drinkStatus;
-  if (drinkTo < CY) drinkStatus = "past";
-  else if (drinkFrom <= CY) drinkStatus = (drinkTo - CY <= 2) ? "urgent" : "now";
-  else if (drinkFrom <= CY + 2) drinkStatus = "soon";
-  else drinkStatus = "wait";
   var allIds = WINES.map(function(w){return w.id;}).concat(CONSUMED.map(function(w){return w.id;}));
   var newId = allIds.length ? Math.max.apply(null, allIds) + 1 : 1;
   WINES.push({
@@ -340,14 +354,14 @@ function addWine() {
     country: country, region: region, vintage: vintage, qty: qty,
     varietal: varietal, style: style,
     purchasePrice: purchasePrice, marketPrice: marketPrice || purchasePrice || 0,
-    score: score, drinkFrom: drinkFrom, drinkTo: drinkTo, drinkStatus: drinkStatus,
+    score: score, drinkFrom: drinkFrom, drinkTo: drinkTo,
     pairings: (window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length) ? window._scanPending.pairings : ["Pending enrichment"],
     summary: (window._scanPending && window._scanPending.summary) ? window._scanPending.summary : "Added manually — bring this file to Claude to complete tasting notes, pairings, and vintage context.",
     purchasePriceEff: purchasePriceEff, qprRaw: null, qprIndex: null,
     pending: !(window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length)
   });
   window._scanPending = null;
-  _recomputeQPR();
+  recomputeDerivedFields();  // fills in drinkStatus + QPR for the new wine
   _logChange("+ Added: " + producer + " — " + wine
     + " (" + (typeof vintage === "string" ? "NV" : vintage) + ") ×" + qty);
   clearAddForm();

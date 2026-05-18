@@ -150,33 +150,12 @@ else:
     wines = _raw.get('wines', [])
     consumed = _raw.get('consumed', [])
 
-# ── normalise drinkStatus ─────────────────────────────────────────────────────
-# drinkStatus is a derived field. Recompute it for every wine on each run so
-# the JSON and embedded JS always use the five values the dashboard understands:
-#   past | urgent | now | soon | wait
-# This prevents "undefined" rendering bugs caused by legacy values like
-# "early", "late", or "peak" that may arrive via manual edits or older exports.
+# ── current year (embedded as a JS constant, also used in stats below) ───────
+# Per-wine derived fields (drinkStatus, qprRaw, qprIndex, purchasePriceEff) are
+# computed in the browser at page load — see recomputeDerivedFields() in
+# dashboard.js. The Python build step does not touch derived fields and does
+# not write back to wines.json; wines.json is mutated only by --sync.
 CY = _today().year
-
-def _compute_drink_status(w, cy):
-    df = w.get('drinkFrom')
-    dt = w.get('drinkTo')
-    if not df or not dt:
-        return w.get('drinkStatus', 'wait')
-    if dt < cy:
-        return 'past'
-    if df <= cy:
-        return 'urgent' if dt == cy else 'now'
-    if df <= cy + 2:
-        return 'soon'
-    return 'wait'
-
-for w in wines:
-    w['drinkStatus'] = _compute_drink_status(w, CY)
-
-# Write corrected statuses back to wines.json so the file stays in sync
-with open(JSON_PATH, 'w', encoding='utf-8') as _f:
-    json.dump({'wines': wines, 'consumed': consumed}, _f, indent=2, ensure_ascii=False)
 
 # ── compute stats ─────────────────────────────────────────────────────────────
 total_bottles = sum(w['qty'] for w in wines)
@@ -195,7 +174,7 @@ red_count = style_counts.get('red', 0)
 sparkling_count = style_counts.get('sparkling', 0)
 white_count = style_counts.get('white', 0)
 
-late_wines = [w for w in wines if w.get('drinkStatus') == 'past']
+late_wines = [w for w in wines if w.get('drinkTo') and w['drinkTo'] < CY]
 late_count = len(late_wines)
 late_wine_examples = ', '.join(
     w['producer'] + ' ' + str(w['vintage']) for w in late_wines
