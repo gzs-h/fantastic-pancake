@@ -6,15 +6,57 @@ This file is the operating brief for any Claude session working on this project.
 
 ## What this project is
 
-A self-contained, single-file HTML wine cellar dashboard with a built-in edit UI. There is no backend, no server, no database. Everything lives in three files in this folder:
+A self-contained, single-file HTML wine cellar dashboard with a built-in edit UI. The generated HTML has no required backend, no database, and runs entirely from `file://`. The source lives in this folder:
 
-- `wines.json` — canonical data source (two-array format: `wines` + `consumed`)
-- `generate_dashboard.py` — Python script that reads wines.json and writes the dated HTML
-- `YYYYMMDD_Wine Cellar Dashboard.html` — generated dashboard (read-only artifact; regenerated from wines.json)
+- `wines.json` — canonical data (two-array format: `wines` + `consumed`)
+- `generate_dashboard.py` — Python build script; reads `wines.json`, renders the template, inlines CSS/JS, writes the dated HTML
+- `template.html.j2` — Jinja2 template defining the HTML structure
+- `dashboard.css` — all styles
+- `dashboard.js` — all browser logic (filtering, sorting, charts, edit drawer, rating modal, scan, export)
+- `requirements.txt` — Python dependencies (`jinja2` for the build; `flask` + `google-genai` are for the optional `server.py` label scanner)
+- `YYYYMMDD_Wine Cellar Dashboard.html` — generated artifact (read-only; regenerated from the source files)
+
+The build step inlines `dashboard.css`, `dashboard.js`, and the embedded data arrays into a single HTML file, so the **output** stays self-contained even though the source is split across several files.
 
 Excel has been retired. The dashboard is the only interface for managing the collection.
 
 **Workflow note:** The user primarily works by making edits in the browser UI, exporting the HTML, and handing that HTML to Claude. Claude reads both `WINES` and `CONSUMED` out of the embedded JS, writes them back to `wines.json`, and regenerates. The user does not manually export JSON.
+
+---
+
+## Data flow
+
+There are two places the wine data lives, and it cycles between them:
+
+1. **`wines.json`** on disk — the persistent source of truth.
+2. **`WINES` and `CONSUMED` constants** embedded in the generated HTML — the live in-browser state. These get mutated when the user uses the Edit drawer or the rating modal.
+
+The round trip:
+
+```
+wines.json
+   │
+   │ python3 generate_dashboard.py
+   │   (reads wines.json, renders template.html.j2, inlines dashboard.css
+   │    and dashboard.js, injects WINES/CONSUMED as JSON constants)
+   ▼
+YYYYMMDD_Wine Cellar Dashboard.html
+   │
+   │ user opens in browser, edits, exports
+   ▼
+exported HTML (same shape, with updated WINES/CONSUMED inside)
+   │
+   │ python3 generate_dashboard.py --sync <exported.html>
+   │   (regex-extracts WINES and CONSUMED from the HTML, diffs against
+   │    wines.json, writes the updated JSON, then regenerates)
+   ▼
+wines.json (back to step 1)
+```
+
+**Two properties that matter for reasoning about the system:**
+
+- `generate_dashboard.py` *without* `--sync` is a pure read — it never writes to `wines.json`. Only `--sync` mutates the JSON.
+- Per-wine derived fields (`drinkStatus`, `qprIndex`, `qprRaw`, `purchasePriceEff`) are computed in `dashboard.js` (`recomputeDerivedFields()`) at page load. `wines.json` is allowed to contain stale derived values; they self-correct on the next browser-load-export-sync cycle.
 
 ---
 
@@ -84,11 +126,11 @@ Each wine object in `wines` has these fields:
   "purchasePriceEff": 18,           // effective purchase price (accounts for discounts)
   "qprRaw": 4.83,                   // score / purchasePriceEff (computed)
   "qprIndex": 8.8,                  // normalized 1–10 (computed)
-  "drinkStatus": "now"              // "early" | "now" | "peak" | "late" (computed vs CY)
+  "drinkStatus": "now"              // past | urgent | now | soon | wait (computed in JS — see logic below)
 }
 ```
 
-Fields marked (computed) are derived — recalculate whenever wines are added/edited.
+Fields marked (computed) are derived in the browser at page load by `recomputeDerivedFields()` in `dashboard.js`. You don't need to fill or maintain them by hand — the dashboard recalculates them automatically every time it's opened, and the corrected values flow back to `wines.json` on the next `--sync`.
 
 Each object in `consumed` has all the same fields as a wine (with `qty` always set to `1`, since each entry represents a single bottle consumed), plus these additional fields:
 
@@ -115,7 +157,7 @@ Each object in `consumed` has all the same fields as a wine (with `qty` always s
 - `soon`: CY < drinkFrom AND drinkFrom <= CY + 2
 - `wait`: CY < drinkFrom AND drinkFrom > CY + 2
 
-**Do not use** `early`, `late`, or `peak` — these are not recognised by the dashboard and will render as "undefined". `generate_dashboard.py` now recomputes `drinkStatus` for every wine on each run and writes the corrected values back to `wines.json`, so stale or invalid statuses are automatically fixed at generation time.
+**Do not use** `early`, `late`, or `peak` — these are not recognised by the dashboard and will render as "undefined". `drinkStatus` is computed in the browser at page load via `recomputeDerivedFields()` in `dashboard.js`, so stale or invalid values in `wines.json` get corrected as soon as the dashboard is opened, and the corrected values flow back to `wines.json` on the next `--sync`. `generate_dashboard.py` itself does not touch `drinkStatus` and does not write to `wines.json` — `wines.json` is mutated only by `--sync`.
 
 ---
 
@@ -136,16 +178,12 @@ Plus an **Edit Collection drawer** (slide-in panel) for add/edit/remove wine ope
 ## Key technical constraints
 
 **Python generation script:**
-- Use `p = []` list + `''.join(p)` pattern — never f-strings (they collide with JS `${}` template literals)
-- Emoji in Python string literals: use `\U0001F377` (8-digit) not `\uD83C\uDF77` (surrogate pairs) — surrogates cause UnicodeEncodeError on file write
+- HTML structure lives in `template.html.j2` and is rendered via Jinja2
+- CSS lives in `dashboard.css`; JS lives in `dashboard.js`. Both are read and inlined into the output HTML at build time
+- Edit those files in their native syntax — no escape gymnastics required
+- Per-wine derived fields (`drinkStatus`, `qprRaw`, `qprIndex`, `purchasePriceEff`) are computed in `dashboard.js` (`recomputeDerivedFields()`), not in Python
+- Aggregate stats (total bottles, market value, vintage span, etc.) are computed in Python at build time for the initial render; JS `refreshStats()` recomputes them after edits
 - Write output with `open(path, 'w', encoding='utf-8')`
-- **Inline style attributes in string-concatenated JS:** always close the attribute quote before `>`. Pattern must be `'">'` not `'>'`. Example — the QPR table discount cell:
-  ```python
-  # CORRECT
-  p.append("+ '<td style=\"color:'+(disc>0?'#4caf7a':'var(--muted)')+'\">'\n")
-  # WRONG — missing closing quote, browser eats cell content as attribute value
-  p.append("+ '<td style=\"color:'+(disc>0?'#4caf7a':'var(--muted)')+'>')\n")
-  ```
 
 **JavaScript in the dashboard:**
 - `const WINES = [...];` and `const CONSUMED = [...];` — both arrays are embedded in the HTML and are the live in-browser state
@@ -163,29 +201,19 @@ Plus an **Edit Collection drawer** (slide-in panel) for add/edit/remove wine ope
 
 ---
 
-## Collection stats (as of 2026-05-09)
-
-- 56 SKUs, 60 bottles (active)
-- 9 bottles consumed (tracked in `consumed` array)
-- 7 countries: Argentina, Australia, Chile, France, Germany, Italy, USA
-- Vintage span: 1988–2025
-- Market value: ~$5.3k
-- Next available ID: 66
-
----
-
 ## Common tasks
 
 **Add a wine:**
-1. Edit `wines.json` — assign the next available `id`, fill all fields
-2. Recompute `qprRaw`, `qprIndex` (requires recalculating min/max across full collection), `drinkStatus`
-3. Run `generate_dashboard.py` to rebuild the HTML
+1. Edit `wines.json` — assign the next available `id`, fill the input fields (producer, wine, country, style, vintage, qty, prices, score, drinkFrom, drinkTo, etc.)
+2. Run `generate_dashboard.py` to rebuild the HTML
+
+Derived fields (`qprRaw`, `qprIndex`, `purchasePriceEff`, `drinkStatus`) are computed in the browser at page load — no manual recompute step. The next time the user opens the dashboard, exports, and you run `--sync`, the populated derived fields flow back to `wines.json`.
 
 **Enrich a pending wine** (one added manually with placeholder data):
 - Search for the producer + wine + vintage online
 - Fill: `appellation`, `region`, `varietal`, `score`, `marketPrice`, `drinkFrom`, `drinkTo`, `pairings`, `summary`
 - Remove `"pending": true` flag if present
-- Recompute QPR fields and regenerate
+- Regenerate the dashboard — derived fields fill themselves at page load
 
 **Remove a wine (mark as consumed):**
 - In the dashboard UI: click ✕ on a wine or use the minus button in the Edit drawer → a rating modal appears (WSET SAT level + optional tasting note) → on confirm, the wine moves to `CONSUMED` with today's date and any rating/note. If qty was > 1 and minus was used, only the qty decrements (wine stays in `WINES`); otherwise the wine is removed from `WINES` entirely.
@@ -195,15 +223,13 @@ Plus an **Edit Collection drawer** (slide-in panel) for add/edit/remove wine ope
 ```bash
 python3 generate_dashboard.py
 ```
-The script reads `wines.json` from this folder and writes the dated HTML back to this folder. After running, apply the versioning logic above (archive old file if it's from a prior date).
+The script reads `wines.json` from this folder and writes the dated HTML back to this folder. Prior-day dashboards are moved into `Archive/` automatically.
 
 ---
 
 ## What NOT to do
 
 - Do not edit the HTML file directly to change data — always go through wines.json
-- Do not use f-strings in the Python generator
-- Do not use `\uD83C\uDF77`-style surrogate pairs for emoji in Python — use `\U0001F377`
 - Do not use `fetch(location.href)` for HTML export — it's blocked for file:// URLs
 - Do not leave the edit drawer open state in exported HTML
 
@@ -211,12 +237,12 @@ The script reads `wines.json` from this folder and writes the dated HTML back to
 
 ## generate_dashboard.py
 
-The script lives permanently in this folder and is tracked in git. It should not need to be reconstructed. If it is somehow missing, it can be rebuilt — it is ~600 lines of Python that:
+The script lives permanently in this folder and is tracked in git. It should not need to be reconstructed. It is ~390 lines of Python that:
 1. Reads `wines.json` (two-array format: `{"wines": [...], "consumed": [...]}`)
-2. Computes stats (bottles, value, style/country counts) — stats operate on `wines` only, not `consumed`
-3. Assembles HTML via string list (`p = []`)
-4. Embeds both `const WINES = [...]` and `const CONSUMED = [...]` in the output
-5. Outputs `YYYYMMDD_Wine Cellar Dashboard.html`
+2. Computes aggregate stats (bottles, value, style/country counts) — stats operate on `wines` only, not `consumed`
+3. Reads `dashboard.css` and `dashboard.js` from this folder
+4. Renders `template.html.j2` via Jinja2, inlining the CSS, JS, and the `WINES` / `CONSUMED` JSON arrays
+5. Writes `YYYYMMDD_Wine Cellar Dashboard.html` (and archives any prior-day dashboard into `Archive/`)
 
 The script also supports `--sync <html_file>`, which extracts both arrays from an exported dashboard HTML, diffs against `wines.json`, checks for ID collisions, preserves `myRating`/`myNote` on consumed entries, and writes the updated JSON — then proceeds to regenerate as normal. This is the standard path for syncing user edits back from the browser.
 
