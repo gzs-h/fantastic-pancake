@@ -1,13 +1,18 @@
 # 86 Wine Cellar
 
-A self-contained wine cellar dashboard — no backend, no database, no dependencies beyond a browser.
+A self-contained wine cellar dashboard. The generated HTML runs in any browser — no backend or database. The build step requires Python + Jinja2.
 
 ## What's here
 
 | File | Purpose |
 |---|---|
 | `wines.json` | Canonical data source. Every bottle lives here. |
-| `generate_dashboard.py` | Reads `wines.json`, writes the dated HTML dashboard. |
+| `generate_dashboard.py` | Build script. Reads `wines.json`, renders the template, writes the dated HTML dashboard. |
+| `template.html.j2` | Jinja2 template defining the dashboard's HTML structure. |
+| `dashboard.css` | Dashboard styles. Inlined into the output HTML at build time. |
+| `dashboard.js` | Dashboard logic — filtering, charts, edit drawer, rating modal. Inlined into the output. |
+| `requirements.txt` | Python dependencies (`jinja2` for the build; `flask` + `google-genai` for the optional label scanner). |
+| `server.py` | Optional Flask-based label scanner server (see "Label scanner" below). |
 | `CLAUDE.md` | Operating brief for Claude sessions working on this project. |
 
 ## Generating the dashboard
@@ -56,7 +61,7 @@ Each wine in `wines.json` has the following fields:
 }
 ```
 
-`qprRaw`, `qprIndex`, and `drinkStatus` are computed — recalculate across the full collection whenever wines are added, edited, or removed.
+`qprRaw`, `qprIndex`, `purchasePriceEff`, and `drinkStatus` are derived fields. They're computed by `dashboard.js` every time the dashboard is opened in a browser, so you don't need to maintain them by hand. Stale values in `wines.json` self-correct on the next browser-load-export-sync cycle.
 
 ## Setup
 
@@ -76,8 +81,10 @@ The label scanner (`server.py`) lets you photograph a bottle and add it to the c
 **1. Install dependencies**
 
 ```bash
-pip3 install flask google-genai
+pip3 install -r requirements.txt
 ```
+
+This installs `jinja2` (needed for the build), plus `flask` and `google-genai` (needed for the label scanner).
 
 **2. Get a Gemini API key**
 
@@ -103,8 +110,8 @@ The dashboard is served at `http://localhost:8086` and the scan UI at `http://lo
 
 ## Workflow
 
-**Adding a wine:** edit `wines.json`, recompute QPR fields and `drinkStatus`, run the generator.
+**Adding a wine:** edit `wines.json` with the input fields (producer, wine, country, style, vintage, qty, prices, score, drinking window), then run the generator. Derived fields populate automatically when the dashboard is opened in a browser.
 
-**Enriching a wine added via the browser UI:** export the dashboard HTML, bring it to a Claude session — it will pull the new entry, research the missing fields, and regenerate.
+**Enriching a wine added via the browser UI:** export the dashboard HTML, bring it to a Claude session — it will run `python3 generate_dashboard.py --sync <html-file>` to pull the new entry into `wines.json`, then research the missing fields and regenerate.
 
-**Quick in-session edits** (qty adjustments, removals): use the Edit drawer in the dashboard, then export the updated JSON to sync back to `wines.json`.
+**Quick in-session edits** (qty adjustments, removals): use the Edit drawer in the dashboard, click Download Updated Dashboard, then run `python3 generate_dashboard.py --sync <html-file>` to write the changes back to `wines.json`. The JSON export button is available as a backup but isn't the standard path.
