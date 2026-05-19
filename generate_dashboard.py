@@ -339,328 +339,50 @@ with open(os.path.join(DIR, 'dashboard.css'), 'r', encoding='utf-8') as _f:
 with open(os.path.join(DIR, 'dashboard.js'), 'r', encoding='utf-8') as _f:
     _js = _f.read()
 
-# ── build HTML ────────────────────────────────────────────────────────────────
-p = []
+# ── render HTML via Jinja2 template ────────────────────────────────────────────
+# All HTML structure lives in template.html.j2. This script supplies the
+# computed values; Jinja handles the assembly.
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-p.append('<!DOCTYPE html>\n')
-p.append('<html lang="en" data-theme="light">\n')
-p.append('<head>\n')
-p.append('<meta charset="UTF-8">\n')
-p.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">\n')
-p.append('<title>Wine Cellar Dashboard</title>\n')
-p.append('<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>\n')
-p.append('<style>\n')
-p.append(_css)
-p.append('</style>\n')
-p.append('</head>\n')
-p.append('<body>\n')
+_env = Environment(
+    loader=FileSystemLoader(DIR),
+    autoescape=False,           # output is treated as raw HTML; values from
+                                # OVERVIEW_PARAS / GAP_ITEMS contain HTML
+                                # entities and tags that must pass through.
+    keep_trailing_newline=True,
+)
+_template = _env.get_template('template.html.j2')
 
-# ── nav ───────────────────────────────────────────────────────────────────────
-p.append('<nav>\n')
-p.append('  <div class="nav-brand">&#9670; Cellar</div>\n')
-p.append('  <div class="nav-tabs">\n')
-p.append('    <div class="nav-tab active" onclick="show(\'overview\',this)">Overview</div>\n')
-p.append('    <div class="nav-tab" onclick="show(\'windows\',this)">Drinking Windows</div>\n')
-p.append('    <div class="nav-tab" onclick="show(\'profiles\',this)">Wine Profiles</div>\n')
-p.append('    <div class="nav-tab" onclick="show(\'qpr\',this)">QPR Analysis</div>\n')
-p.append('    <div class="nav-tab" onclick="show(\'history\',this)">Drinking History</div>\n')
-p.append('  </div>\n')
-p.append('  <div class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">\n')
-p.append('    <span class="theme-toggle-label" id="themeLabel">Dark</span>\n')
-p.append('    <div class="toggle-pill"><div class="toggle-knob" id="toggleKnob">\U0001F319</div></div>\n')
-p.append('  </div>\n')
-p.append('  <button class="edit-btn scan-nav" onclick="openScanDrawer()">&#128247;&nbsp;Scan Label</button>\n')
-p.append('  <button class="edit-btn" onclick="openDrawer()">&#9998;&nbsp;Edit</button>\n')
-p.append('</nav>\n\n')
+_html = _template.render(
+    # stat-card values
+    total_bottles=total_bottles,
+    sku_count=sku_count,
+    country_count=country_count,
+    mv_str=mv_str,
+    vintage_span=vintage_span,
+    # narrative
+    overview_paras=OVERVIEW_PARAS,
+    gap_items=GAP_ITEMS,
+    # drinking notes (conditional block)
+    consumed_count=consumed_count,
+    rated_count=rated_count,
+    rating_dist_str=rating_dist_str,
+    consumed_styles_str=consumed_styles_str,
+    top_rated=top_rated,
+    # QPR methodology
+    priced_count=priced_count,
+    total_count=total_count,
+    # assets
+    css=_css,
+    js=_js,
+    # data
+    wines_json=wines_json,
+    consumed_json=consumed_json,
+    cy=CY,
+)
 
-# ── overview ──────────────────────────────────────────────────────────────────
-p.append('<!-- OVERVIEW -->\n')
-p.append('<div id="overview" class="section active">\n')
-p.append('  <div class="stat-grid">\n')
-p.append('    <div class="stat-card"><div class="stat-val">' + str(total_bottles) + '</div><div class="stat-label">Bottles</div></div>\n')
-p.append('    <div class="stat-card"><div class="stat-val">' + str(sku_count) + '</div><div class="stat-label">SKUs</div></div>\n')
-p.append('    <div class="stat-card"><div class="stat-val">' + str(country_count) + '</div><div class="stat-label">Countries</div></div>\n')
-p.append('    <div class="stat-card"><div class="stat-val">' + mv_str + '</div><div class="stat-label">Market Value</div></div>\n')
-p.append('    <div class="stat-card"><div class="stat-val">' + vintage_span + '</div><div class="stat-label">Vintage Span</div></div>\n')
-p.append('  </div>\n')
-p.append('  <div class="narrative">\n')
-p.append('    <h2>Collection Overview</h2>\n')
-for i, para in enumerate(OVERVIEW_PARAS):
-    style = ' style="margin-top:10px"' if i > 0 else ''
-    p.append('    <p' + style + '>' + para + '</p>\n')
-p.append('  </div>\n')
-p.append('  <div class="charts-grid">\n')
-p.append('    <div class="chart-card"><div class="chart-title">Geographic Distribution (bottles)</div><canvas id="countryChart"></canvas></div>\n')
-p.append('    <div class="chart-card"><div class="chart-title">Style Distribution</div><canvas id="styleChart"></canvas></div>\n')
-p.append('    <div class="chart-card full"><div class="chart-title">Varietal Breakdown</div><canvas id="varietalChart"></canvas></div>\n')
-p.append('  </div>\n')
-p.append('  <div class="chart-card" style="margin-bottom:0">\n')
-p.append('    <div class="chart-title">Collection Gaps &mdash; Neutral Assessment</div>\n')
-p.append('    <div style="margin-top:4px">\n')
-for label, text in GAP_ITEMS:
-    p.append('      <div class="gap-item"><span class="gap-label">' + label + '</span>' + text + '</div>\n')
-p.append('    </div>\n')
-p.append('  </div>\n')
-
-# ── drinking notes (mechanically generated from consumed array) ──────────────
-if consumed_count > 0:
-    p.append('  <div class="narrative" style="margin-top:20px">\n')
-    p.append('    <h2>Drinking Notes</h2>\n')
-    dn_line1 = (str(consumed_count) + ' bottle' + ('' if consumed_count == 1 else 's')
-                + ' consumed so far')
-    if rated_count > 0:
-        dn_line1 += (', ' + str(rated_count) + ' rated: ' + rating_dist_str + '.')
-    else:
-        dn_line1 += '.'
-    p.append('    <p>' + dn_line1 + '</p>\n')
-    if consumed_styles_str:
-        p.append('    <p style="margin-top:8px">Styles explored: ' + consumed_styles_str + '.</p>\n')
-    if top_rated:
-        p.append('    <p style="margin-top:8px">Highest-rated consumption: '
-                 + top_rated['producer'] + ' &mdash; ' + top_rated['wine'] + ' '
-                 + str(top_rated['vintage']) + ' ('
-                 + top_rated['myRating'] + ').</p>\n')
-    p.append('  </div>\n')
-
-p.append('</div>\n\n')
-
-# ── drinking windows ──────────────────────────────────────────────────────────
-p.append('<!-- DRINKING WINDOWS -->\n')
-p.append('<div id="windows" class="section">\n')
-p.append('  <div class="gantt-controls">\n')
-p.append('    <div class="gantt-legend">\n')
-p.append('      <div class="legend-item"><div class="legend-dot" style="background:#e05050"></div>Past window</div>\n')
-p.append('      <div class="legend-item"><div class="legend-dot" style="background:#e07830"></div>Open urgently</div>\n')
-p.append('      <div class="legend-item"><div class="legend-dot" style="background:#4caf7a"></div>Drink now</div>\n')
-p.append('      <div class="legend-item"><div class="legend-dot" style="background:#5090c8"></div>Open in 1&ndash;2 yrs</div>\n')
-p.append('      <div class="legend-item"><div class="legend-dot" style="background:#7a6a7a"></div>Needs time (3+ yrs)</div>\n')
-p.append('    </div>\n')
-p.append('    <select id="wSort" onchange="renderWindows()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px;font-family:Georgia,serif">\n')
-p.append('      <option value="status">Sort by urgency</option>\n')
-p.append('      <option value="vintage">Sort by vintage</option>\n')
-p.append('      <option value="country">Sort by country</option>\n')
-p.append('      <option value="style">Sort by style</option>\n')
-p.append('    </select>\n')
-p.append('  </div>\n')
-p.append('  <div style="overflow-x:auto">\n')
-p.append('    <table class="gantt-table">\n')
-p.append('      <thead><tr>\n')
-p.append('        <th style="width:220px">Wine</th>\n')
-p.append('        <th style="width:68px">Vintage</th>\n')
-p.append('        <th style="width:80px">Country</th>\n')
-p.append('        <th style="width:96px">Status</th>\n')
-p.append('        <th>Drinking Window (2000 &mdash; 2048)</th>\n')
-p.append('      </tr></thead>\n')
-p.append('      <tbody id="wBody"></tbody>\n')
-p.append('    </table>\n')
-p.append('  </div>\n')
-p.append('</div>\n\n')
-
-# ── profiles ──────────────────────────────────────────────────────────────────
-p.append('<!-- PROFILES -->\n')
-p.append('<div id="profiles" class="section">\n')
-p.append('  <div class="filter-bar">\n')
-p.append('    <div class="filter-group"><label>Search</label><input type="text" id="sSearch" placeholder="Producer, wine, region&hellip;" style="width:200px" oninput="renderProfiles()"></div>\n')
-p.append('    <div class="filter-group"><label>Style</label>\n')
-p.append('      <select id="sStyle" onchange="renderProfiles()">\n')
-p.append('        <option value="">All</option><option value="red">Red</option><option value="white">White</option>\n')
-p.append('        <option value="sparkling">Sparkling</option><option value="ros&eacute;">Ros&eacute;</option>\n')
-p.append('        <option value="dessert">Dessert</option><option value="orange">Orange</option>\n')
-p.append('      </select>\n')
-p.append('    </div>\n')
-p.append('    <div class="filter-group"><label>Country</label>\n')
-p.append('      <select id="sCountry" onchange="renderProfiles()">\n')
-p.append('        <option value="">All</option><option value="France">France</option><option value="USA">USA</option>\n')
-p.append('        <option value="Italy">Italy</option><option value="Germany">Germany</option>\n')
-p.append('        <option value="Argentina">Argentina</option><option value="Chile">Chile</option><option value="Australia">Australia</option>\n')
-p.append('      </select>\n')
-p.append('    </div>\n')
-p.append('    <div class="filter-group"><label>Status</label>\n')
-p.append('      <select id="sStatus" onchange="renderProfiles()">\n')
-p.append('        <option value="">All</option><option value="past">Past window</option><option value="urgent">Open urgently</option>\n')
-p.append('        <option value="now">Drink now</option><option value="soon">Open soon</option><option value="wait">Needs time</option>\n')
-p.append('      </select>\n')
-p.append('    </div>\n')
-p.append('    <div class="res-count" id="resCount"></div>\n')
-p.append('  </div>\n')
-p.append('  <div class="card-grid" id="cardGrid"></div>\n')
-p.append('</div>\n\n')
-
-# ── QPR ───────────────────────────────────────────────────────────────────────
-p.append('<!-- QPR -->\n')
-p.append('<div id="qpr" class="section">\n')
-p.append('  <div class="narrative" style="margin-bottom:20px">\n')
-p.append('    <h2>QPR Methodology</h2>\n')
-p.append('    <p>QPR Index (1&ndash;10) = <em>(critic score) &divide; (purchase price paid)</em>, normalized across wines where a purchase price was recorded. ' + str(priced_count) + ' of ' + str(total_count) + ' wines have a recorded price and appear below; the remainder are excluded rather than estimated. RNDC Wine Library bottles acquired at ~$18 dominate the top rankings. Bubble size reflects discount to market (larger = bought further below market price).</p>\n')
-p.append('  </div>\n')
-p.append('  <div class="chart-card" style="margin-bottom:20px">\n')
-p.append('    <div class="chart-title">Score vs. Purchase Price &mdash; hover for details</div>\n')
-p.append('    <canvas id="qprScatter" style="max-height:380px"></canvas>\n')
-p.append('  </div>\n')
-p.append('  <div class="qpr-table-wrap">\n')
-p.append('    <table class="qpr-table">\n')
-p.append('      <thead><tr>\n')
-p.append('        <th>Wine</th><th>Vintage</th><th>Score</th><th>Paid</th><th>Market</th><th>Discount</th><th>QPR</th>\n')
-p.append('      </tr></thead>\n')
-p.append('      <tbody id="qprBody"></tbody>\n')
-p.append('    </table>\n')
-p.append('  </div>\n')
-p.append('</div>\n\n')
-
-# ── drinking history ─────────────────────────────────────────────────────────
-p.append('<!-- DRINKING HISTORY -->\n')
-p.append('<div id="history" class="section">\n')
-p.append('  <div class="narrative" style="margin-bottom:20px">\n')
-p.append('    <h2>Drinking History</h2>\n')
-p.append('    <p>Wines removed from the collection, recorded in order of consumption. Date reflects when the bottle was logged as consumed in the dashboard.</p>\n')
-p.append('    <p style="margin-top:8px;font-size:13px;color:var(--muted)">Ratings use the WSET SAT quality scale (faulty through outstanding), weighing intensity, complexity, balance, finish, and typicity.</p>\n')
-p.append('  </div>\n')
-p.append('  <div id="historyEmpty" style="display:none;color:var(--muted);font-size:14px;padding:20px 0">No bottles consumed yet.</div>\n')
-p.append('  <div class="qpr-table-wrap" id="historyWrap">\n')
-p.append('    <table class="qpr-table">\n')
-p.append('      <thead><tr>\n')
-p.append('        <th>Date Consumed</th><th>Wine</th><th>Vintage</th><th>Style</th><th>Score</th><th>My Rating</th>\n')
-p.append('      </tr></thead>\n')
-p.append('      <tbody id="historyBody"></tbody>\n')
-p.append('    </table>\n')
-p.append('  </div>\n')
-p.append('</div>\n\n')
-
-# ── rating modal ─────────────────────────────────────────────────────────────
-p.append('<!-- RATING MODAL -->\n')
-p.append('<div class="rate-overlay" id="rateOverlay">\n')
-p.append('  <div class="rate-dialog">\n')
-p.append('    <div class="rate-title">Rate This Wine</div>\n')
-p.append('    <div class="rate-wine-name" id="rateWineName"></div>\n')
-p.append('    <div class="rate-section-label">Quality Assessment (WSET SAT)</div>\n')
-p.append('    <div class="rate-btns" id="rateBtns">\n')
-p.append('      <button class="rate-btn" data-val="faulty">Faulty</button>\n')
-p.append('      <button class="rate-btn" data-val="poor">Poor</button>\n')
-p.append('      <button class="rate-btn" data-val="acceptable">Acceptable</button>\n')
-p.append('      <button class="rate-btn" data-val="good">Good</button>\n')
-p.append('      <button class="rate-btn" data-val="very good">Very Good</button>\n')
-p.append('      <button class="rate-btn" data-val="outstanding">Outstanding</button>\n')
-p.append('    </div>\n')
-p.append('    <div class="rate-section-label">Tasting Note (optional)</div>\n')
-p.append('    <textarea class="rate-note" id="rateNote" placeholder="Acidity, tannin, body, finish — what stood out?"></textarea>\n')
-p.append('    <div class="rate-actions">\n')
-p.append('      <button class="btn-secondary" id="rateCancelBtn">Cancel</button>\n')
-p.append('      <button class="btn-primary" id="rateConfirmBtn">Confirm Removal</button>\n')
-p.append('    </div>\n')
-p.append('  </div>\n')
-p.append('</div>\n\n')
-
-# ── edit drawer ───────────────────────────────────────────────────────────────
-p.append('<!-- EDIT DRAWER -->\n')
-p.append('<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>\n')
-p.append('<div class="drawer" id="editDrawer">\n')
-p.append('  <div class="drawer-hdr">\n')
-p.append('    <span class="drawer-title">&#9670; Edit Collection</span>\n')
-p.append('    <button class="drawer-close" onclick="closeDrawer()">&#x2715;</button>\n')
-p.append('  </div>\n')
-p.append('  <div class="drawer-tabs">\n')
-p.append('    <div class="drawer-tab active" onclick="switchEditTab(\'inventory\',this)">Inventory</div>\n')
-p.append('    <div class="drawer-tab" onclick="switchEditTab(\'add\',this)">Add Wine</div>\n')
-p.append('    <div class="drawer-tab" onclick="switchEditTab(\'export\',this)">Save &amp; Export</div>\n')
-p.append('  </div>\n')
-p.append('  <div class="drawer-body">\n')
-p.append('    <div class="drawer-panel active" id="panel-inventory">\n')
-p.append('      <input class="inv-search" type="text" id="invSearch" placeholder="Search wines&#8230;" oninput="renderInvList()">\n')
-p.append('      <div class="inv-list" id="invList"></div>\n')
-p.append('    </div>\n')
-p.append('    <div class="drawer-panel" id="panel-add">\n')
-p.append('      <button class="scan-btn-full" id="scanBtn" onclick="scanLabel()">&#128247;&nbsp;Scan Label</button>\n')
-p.append('      <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none" onchange="handleScanFile(this)">\n')
-p.append('      <div class="scan-status-line" id="scanStatus"></div>\n')
-p.append('      <div id="keyArea" style="display:none">\n')
-p.append('        <div class="key-area-inner">\n')
-p.append('          <div class="key-row">\n')
-p.append('            <input type="password" id="keyInput" placeholder="Paste Gemini API key\u2026">\n')
-p.append('            <button class="btn-secondary" onclick="saveKey()" style="padding:5px 10px;font-size:11px">Save</button>\n')
-p.append('            <button class="btn-secondary" onclick="clearKey()" style="padding:5px 10px;font-size:11px;color:#e05050">Clear</button>\n')
-p.append('          </div>\n')
-p.append('        </div>\n')
-p.append('      </div>\n')
-p.append('      <div class="scan-footer-row">\n')
-p.append('        <span id="keyStatusLine" style="color:var(--muted)">\u2014</span>\n')
-p.append('        <span class="key-link" onclick="toggleKeyArea()">&#9881;&nbsp;API key</span>\n')
-p.append('      </div>\n')
-p.append('      <hr class="scan-divider">\n')
-p.append('      <div class="form-grid">\n')
-p.append('        <div class="form-group"><label>Producer *</label><input type="text" id="f-producer" placeholder="e.g. Domaine Leflaive"></div>\n')
-p.append('        <div class="form-group"><label>Wine Name *</label><input type="text" id="f-wine" placeholder="e.g. Puligny-Montrachet"></div>\n')
-p.append('        <div class="form-group"><label>Appellation</label><input type="text" id="f-appellation" placeholder="e.g. Puligny-Montrachet"></div>\n')
-p.append('        <div class="form-group"><label>Country *</label>\n')
-p.append('          <select id="f-country">\n')
-p.append('            <option value="">Select&#8230;</option>\n')
-p.append('            <option>France</option><option>USA</option><option>Italy</option>\n')
-p.append('            <option>Germany</option><option>Argentina</option><option>Chile</option>\n')
-p.append('            <option>Australia</option><option>Spain</option><option>Other</option>\n')
-p.append('          </select>\n')
-p.append('        </div>\n')
-p.append('        <div class="form-group"><label>Style *</label>\n')
-p.append('          <select id="f-style">\n')
-p.append('            <option value="">Select&#8230;</option>\n')
-p.append('            <option value="red">Red</option><option value="white">White</option>\n')
-p.append('            <option value="sparkling">Sparkling</option><option value="ros\u00e9">Ros\u00e9</option>\n')
-p.append('            <option value="dessert">Dessert</option><option value="orange">Orange</option>\n')
-p.append('          </select>\n')
-p.append('        </div>\n')
-p.append('        <div class="form-group"><label>Varietal</label><input type="text" id="f-varietal" placeholder="e.g. Chardonnay"></div>\n')
-p.append('        <div class="form-group"><label>Vintage</label><input type="number" id="f-vintage" placeholder="e.g. 2019" min="1900" max="2030"></div>\n')
-p.append('        <div class="form-group"><label>Quantity *</label><input type="number" id="f-qty" value="1" min="1" max="100"></div>\n')
-p.append('        <div class="form-group"><label>Purchase Price ($)</label><input type="number" id="f-purchase" placeholder="what you paid" min="0" step="0.01"></div>\n')
-p.append('        <div class="form-group"><label>Market Price ($)</label><input type="number" id="f-market" placeholder="current market" min="0" step="0.01"></div>\n')
-p.append('        <div class="form-group"><label>Score (pts)</label><input type="number" id="f-score" placeholder="e.g. 92" min="50" max="100"></div>\n')
-p.append('        <div class="form-group"><label>Region</label><input type="text" id="f-region" placeholder="e.g. Burgundy"></div>\n')
-p.append('        <div class="form-group"><label>Drink From</label><input type="number" id="f-from" placeholder="e.g. 2024" min="2000" max="2060"></div>\n')
-p.append('        <div class="form-group"><label>Drink To</label><input type="number" id="f-to" placeholder="e.g. 2032" min="2000" max="2060"></div>\n')
-p.append('      </div>\n')
-p.append('      <p class="add-note">Fields marked * are required. Pairings and tasting notes will show as <span class="pending-badge">pending enrichment</span> &#8212; bring this file back to Claude to complete them.</p>\n')
-p.append('      <div style="display:flex;gap:8px;margin-top:16px">\n')
-p.append('        <button class="btn-primary" onclick="addWine()">Add to Collection</button>\n')
-p.append('        <button class="btn-secondary" onclick="clearAddForm()">Clear</button>\n')
-p.append('      </div>\n')
-p.append('      <div id="add-msg" style="margin-top:10px;font-size:12px;min-height:18px"></div>\n')
-p.append('    </div>\n')
-p.append('    <div class="drawer-panel" id="panel-export">\n')
-p.append('      <div class="export-section">\n')
-p.append('        <h3>Session Changes</h3>\n')
-p.append('        <div class="change-log" id="changeLog"><span style="font-style:italic">No changes yet this session.</span></div>\n')
-p.append('      </div>\n')
-p.append('      <div class="export-section" style="margin-top:20px">\n')
-p.append('        <h3>Save Dashboard</h3>\n')
-p.append('        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">Downloads an updated copy of this file with your changes baked in. Replace your existing file with the downloaded version.</p>\n')
-p.append('        <button class="btn-primary" onclick="exportHTML()" style="width:100%">&#8595;&nbsp;Download Updated Dashboard (.html)</button>\n')
-p.append('      </div>\n')
-p.append('      <div class="export-section" style="margin-top:16px">\n')
-p.append('        <h3>Export Data</h3>\n')
-p.append('        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">Portable data file for backup or for use in future Claude sessions.</p>\n')
-p.append('        <button class="btn-secondary" onclick="exportJSON()" style="width:100%">&#8595;&nbsp;Download wines.json</button>\n')
-p.append('      </div>\n')
-p.append('    </div>\n')
-p.append('  </div>\n')
-p.append('</div>\n\n')
-
-# ── JavaScript ────────────────────────────────────────────────────────────────
-p.append('<script>\n')
-p.append('const WINES = ')
-p.append(wines_json)
-p.append(';\n')
-p.append('const CONSUMED = ')
-p.append(consumed_json)
-p.append(';\n')
-p.append('const CY = ' + str(CY) + ';\n\n')
-
-p.append(_js)
-p.append('</script>\n')
-p.append('<button class="scan-fab" onclick="openScanDrawer()" title="Scan wine label">&#128247;</button>\n')
-p.append('</body>\n')
-p.append('</html>\n')
-
-# ── write output ──────────────────────────────────────────────────────────────
 with open(out_path, 'w', encoding='utf-8') as f:
-    f.write(''.join(p))
+    f.write(_html)
 
 print('Written: ' + out_path)
 print('  ' + str(sku_count) + ' SKUs, ' + str(total_bottles) + ' bottles, ' + str(country_count) + ' countries')

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wine Cellar Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+{{ css }}</style>
+</head>
+<body>
+<nav>
+  <div class="nav-brand">&#9670; Cellar</div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="show('overview',this)">Overview</div>
+    <div class="nav-tab" onclick="show('windows',this)">Drinking Windows</div>
+    <div class="nav-tab" onclick="show('profiles',this)">Wine Profiles</div>
+    <div class="nav-tab" onclick="show('qpr',this)">QPR Analysis</div>
+    <div class="nav-tab" onclick="show('history',this)">Drinking History</div>
+  </div>
+  <div class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+    <span class="theme-toggle-label" id="themeLabel">Dark</span>
+    <div class="toggle-pill"><div class="toggle-knob" id="toggleKnob">🌙</div></div>
+  </div>
+  <button class="edit-btn scan-nav" onclick="openScanDrawer()">&#128247;&nbsp;Scan Label</button>
+  <button class="edit-btn" onclick="openDrawer()">&#9998;&nbsp;Edit</button>
+</nav>
+
+<!-- OVERVIEW -->
+<div id="overview" class="section active">
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val">{{ total_bottles }}</div><div class="stat-label">Bottles</div></div>
+    <div class="stat-card"><div class="stat-val">{{ sku_count }}</div><div class="stat-label">SKUs</div></div>
+    <div class="stat-card"><div class="stat-val">{{ country_count }}</div><div class="stat-label">Countries</div></div>
+    <div class="stat-card"><div class="stat-val">{{ mv_str }}</div><div class="stat-label">Market Value</div></div>
+    <div class="stat-card"><div class="stat-val">{{ vintage_span }}</div><div class="stat-label">Vintage Span</div></div>
+  </div>
+  <div class="narrative">
+    <h2>Collection Overview</h2>
+{%- for para in overview_paras %}
+    <p{% if not loop.first %} style="margin-top:10px"{% endif %}>{{ para }}</p>
+{%- endfor %}
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card"><div class="chart-title">Geographic Distribution (bottles)</div><canvas id="countryChart"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Style Distribution</div><canvas id="styleChart"></canvas></div>
+    <div class="chart-card full"><div class="chart-title">Varietal Breakdown</div><canvas id="varietalChart"></canvas></div>
+  </div>
+  <div class="chart-card" style="margin-bottom:0">
+    <div class="chart-title">Collection Gaps &mdash; Neutral Assessment</div>
+    <div style="margin-top:4px">
+{%- for label, text in gap_items %}
+      <div class="gap-item"><span class="gap-label">{{ label }}</span>{{ text }}</div>
+{%- endfor %}
+    </div>
+  </div>
+{%- if consumed_count > 0 %}
+  <div class="narrative" style="margin-top:20px">
+    <h2>Drinking Notes</h2>
+    <p>{{ consumed_count }} bottle{{ '' if consumed_count == 1 else 's' }} consumed so far{% if rated_count > 0 %}, {{ rated_count }} rated: {{ rating_dist_str }}.{% else %}.{% endif %}</p>
+{%- if consumed_styles_str %}
+    <p style="margin-top:8px">Styles explored: {{ consumed_styles_str }}.</p>
+{%- endif %}
+{%- if top_rated %}
+    <p style="margin-top:8px">Highest-rated consumption: {{ top_rated.producer }} &mdash; {{ top_rated.wine }} {{ top_rated.vintage }} ({{ top_rated.myRating }}).</p>
+{%- endif %}
+  </div>
+{%- endif %}
+</div>
+
+<!-- DRINKING WINDOWS -->
+<div id="windows" class="section">
+  <div class="gantt-controls">
+    <div class="gantt-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#e05050"></div>Past window</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#e07830"></div>Open urgently</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4caf7a"></div>Drink now</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#5090c8"></div>Open in 1&ndash;2 yrs</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#7a6a7a"></div>Needs time (3+ yrs)</div>
+    </div>
+    <select id="wSort" onchange="renderWindows()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px;font-family:Georgia,serif">
+      <option value="status">Sort by urgency</option>
+      <option value="vintage">Sort by vintage</option>
+      <option value="country">Sort by country</option>
+      <option value="style">Sort by style</option>
+    </select>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="gantt-table">
+      <thead><tr>
+        <th style="width:220px">Wine</th>
+        <th style="width:68px">Vintage</th>
+        <th style="width:80px">Country</th>
+        <th style="width:96px">Status</th>
+        <th>Drinking Window (2000 &mdash; 2048)</th>
+      </tr></thead>
+      <tbody id="wBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PROFILES -->
+<div id="profiles" class="section">
+  <div class="filter-bar">
+    <div class="filter-group"><label>Search</label><input type="text" id="sSearch" placeholder="Producer, wine, region&hellip;" style="width:200px" oninput="renderProfiles()"></div>
+    <div class="filter-group"><label>Style</label>
+      <select id="sStyle" onchange="renderProfiles()">
+        <option value="">All</option><option value="red">Red</option><option value="white">White</option>
+        <option value="sparkling">Sparkling</option><option value="ros&eacute;">Ros&eacute;</option>
+        <option value="dessert">Dessert</option><option value="orange">Orange</option>
+      </select>
+    </div>
+    <div class="filter-group"><label>Country</label>
+      <select id="sCountry" onchange="renderProfiles()">
+        <option value="">All</option><option value="France">France</option><option value="USA">USA</option>
+        <option value="Italy">Italy</option><option value="Germany">Germany</option>
+        <option value="Argentina">Argentina</option><option value="Chile">Chile</option><option value="Australia">Australia</option>
+      </select>
+    </div>
+    <div class="filter-group"><label>Status</label>
+      <select id="sStatus" onchange="renderProfiles()">
+        <option value="">All</option><option value="past">Past window</option><option value="urgent">Open urgently</option>
+        <option value="now">Drink now</option><option value="soon">Open soon</option><option value="wait">Needs time</option>
+      </select>
+    </div>
+    <div class="res-count" id="resCount"></div>
+  </div>
+  <div class="card-grid" id="cardGrid"></div>
+</div>
+
+<!-- QPR -->
+<div id="qpr" class="section">
+  <div class="narrative" style="margin-bottom:20px">
+    <h2>QPR Methodology</h2>
+    <p>QPR Index (1&ndash;10) = <em>(critic score) &divide; (purchase price paid)</em>, normalized across wines where a purchase price was recorded. {{ priced_count }} of {{ total_count }} wines have a recorded price and appear below; the remainder are excluded rather than estimated. RNDC Wine Library bottles acquired at ~$18 dominate the top rankings. Bubble size reflects discount to market (larger = bought further below market price).</p>
+  </div>
+  <div class="chart-card" style="margin-bottom:20px">
+    <div class="chart-title">Score vs. Purchase Price &mdash; hover for details</div>
+    <canvas id="qprScatter" style="max-height:380px"></canvas>
+  </div>
+  <div class="qpr-table-wrap">
+    <table class="qpr-table">
+      <thead><tr>
+        <th>Wine</th><th>Vintage</th><th>Score</th><th>Paid</th><th>Market</th><th>Discount</th><th>QPR</th>
+      </tr></thead>
+      <tbody id="qprBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DRINKING HISTORY -->
+<div id="history" class="section">
+  <div class="narrative" style="margin-bottom:20px">
+    <h2>Drinking History</h2>
+    <p>Wines removed from the collection, recorded in order of consumption. Date reflects when the bottle was logged as consumed in the dashboard.</p>
+    <p style="margin-top:8px;font-size:13px;color:var(--muted)">Ratings use the WSET SAT quality scale (faulty through outstanding), weighing intensity, complexity, balance, finish, and typicity.</p>
+  </div>
+  <div id="historyEmpty" style="display:none;color:var(--muted);font-size:14px;padding:20px 0">No bottles consumed yet.</div>
+  <div class="qpr-table-wrap" id="historyWrap">
+    <table class="qpr-table">
+      <thead><tr>
+        <th>Date Consumed</th><th>Wine</th><th>Vintage</th><th>Style</th><th>Score</th><th>My Rating</th>
+      </tr></thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- RATING MODAL -->
+<div class="rate-overlay" id="rateOverlay">
+  <div class="rate-dialog">
+    <div class="rate-title">Rate This Wine</div>
+    <div class="rate-wine-name" id="rateWineName"></div>
+    <div class="rate-section-label">Quality Assessment (WSET SAT)</div>
+    <div class="rate-btns" id="rateBtns">
+      <button class="rate-btn" data-val="faulty">Faulty</button>
+      <button class="rate-btn" data-val="poor">Poor</button>
+      <button class="rate-btn" data-val="acceptable">Acceptable</button>
+      <button class="rate-btn" data-val="good">Good</button>
+      <button class="rate-btn" data-val="very good">Very Good</button>
+      <button class="rate-btn" data-val="outstanding">Outstanding</button>
+    </div>
+    <div class="rate-section-label">Tasting Note (optional)</div>
+    <textarea class="rate-note" id="rateNote" placeholder="Acidity, tannin, body, finish — what stood out?"></textarea>
+    <div class="rate-actions">
+      <button class="btn-secondary" id="rateCancelBtn">Cancel</button>
+      <button class="btn-primary" id="rateConfirmBtn">Confirm Removal</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="editDrawer">
+  <div class="drawer-hdr">
+    <span class="drawer-title">&#9670; Edit Collection</span>
+    <button class="drawer-close" onclick="closeDrawer()">&#x2715;</button>
+  </div>
+  <div class="drawer-tabs">
+    <div class="drawer-tab active" onclick="switchEditTab('inventory',this)">Inventory</div>
+    <div class="drawer-tab" onclick="switchEditTab('add',this)">Add Wine</div>
+    <div class="drawer-tab" onclick="switchEditTab('export',this)">Save &amp; Export</div>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-panel active" id="panel-inventory">
+      <input class="inv-search" type="text" id="invSearch" placeholder="Search wines&#8230;" oninput="renderInvList()">
+      <div class="inv-list" id="invList"></div>
+    </div>
+    <div class="drawer-panel" id="panel-add">
+      <button class="scan-btn-full" id="scanBtn" onclick="scanLabel()">&#128247;&nbsp;Scan Label</button>
+      <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none" onchange="handleScanFile(this)">
+      <div class="scan-status-line" id="scanStatus"></div>
+      <div id="keyArea" style="display:none">
+        <div class="key-area-inner">
+          <div class="key-row">
+            <input type="password" id="keyInput" placeholder="Paste Gemini API key…">
+            <button class="btn-secondary" onclick="saveKey()" style="padding:5px 10px;font-size:11px">Save</button>
+            <button class="btn-secondary" onclick="clearKey()" style="padding:5px 10px;font-size:11px;color:#e05050">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="scan-footer-row">
+        <span id="keyStatusLine" style="color:var(--muted)">—</span>
+        <span class="key-link" onclick="toggleKeyArea()">&#9881;&nbsp;API key</span>
+      </div>
+      <hr class="scan-divider">
+      <div class="form-grid">
+        <div class="form-group"><label>Producer *</label><input type="text" id="f-producer" placeholder="e.g. Domaine Leflaive"></div>
+        <div class="form-group"><label>Wine Name *</label><input type="text" id="f-wine" placeholder="e.g. Puligny-Montrachet"></div>
+        <div class="form-group"><label>Appellation</label><input type="text" id="f-appellation" placeholder="e.g. Puligny-Montrachet"></div>
+        <div class="form-group"><label>Country *</label>
+          <select id="f-country">
+            <option value="">Select&#8230;</option>
+            <option>France</option><option>USA</option><option>Italy</option>
+            <option>Germany</option><option>Argentina</option><option>Chile</option>
+            <option>Australia</option><option>Spain</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Style *</label>
+          <select id="f-style">
+            <option value="">Select&#8230;</option>
+            <option value="red">Red</option><option value="white">White</option>
+            <option value="sparkling">Sparkling</option><option value="rosé">Rosé</option>
+            <option value="dessert">Dessert</option><option value="orange">Orange</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Varietal</label><input type="text" id="f-varietal" placeholder="e.g. Chardonnay"></div>
+        <div class="form-group"><label>Vintage</label><input type="number" id="f-vintage" placeholder="e.g. 2019" min="1900" max="2030"></div>
+        <div class="form-group"><label>Quantity *</label><input type="number" id="f-qty" value="1" min="1" max="100"></div>
+        <div class="form-group"><label>Purchase Price ($)</label><input type="number" id="f-purchase" placeholder="what you paid" min="0" step="0.01"></div>
+        <div class="form-group"><label>Market Price ($)</label><input type="number" id="f-market" placeholder="current market" min="0" step="0.01"></div>
+        <div class="form-group"><label>Score (pts)</label><input type="number" id="f-score" placeholder="e.g. 92" min="50" max="100"></div>
+        <div class="form-group"><label>Region</label><input type="text" id="f-region" placeholder="e.g. Burgundy"></div>
+        <div class="form-group"><label>Drink From</label><input type="number" id="f-from" placeholder="e.g. 2024" min="2000" max="2060"></div>
+        <div class="form-group"><label>Drink To</label><input type="number" id="f-to" placeholder="e.g. 2032" min="2000" max="2060"></div>
+      </div>
+      <p class="add-note">Fields marked * are required. Pairings and tasting notes will show as <span class="pending-badge">pending enrichment</span> &#8212; bring this file back to Claude to complete them.</p>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn-primary" onclick="addWine()">Add to Collection</button>
+        <button class="btn-secondary" onclick="clearAddForm()">Clear</button>
+      </div>
+      <div id="add-msg" style="margin-top:10px;font-size:12px;min-height:18px"></div>
+    </div>
+    <div class="drawer-panel" id="panel-export">
+      <div class="export-section">
+        <h3>Session Changes</h3>
+        <div class="change-log" id="changeLog"><span style="font-style:italic">No changes yet this session.</span></div>
+      </div>
+      <div class="export-section" style="margin-top:20px">
+        <h3>Save Dashboard</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">Downloads an updated copy of this file with your changes baked in. Replace your existing file with the downloaded version.</p>
+        <button class="btn-primary" onclick="exportHTML()" style="width:100%">&#8595;&nbsp;Download Updated Dashboard (.html)</button>
+      </div>
+      <div class="export-section" style="margin-top:16px">
+        <h3>Export Data</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.55">Portable data file for backup or for use in future Claude sessions.</p>
+        <button class="btn-secondary" onclick="exportJSON()" style="width:100%">&#8595;&nbsp;Download wines.json</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WINES = {{ wines_json }};
+const CONSUMED = {{ consumed_json }};
+const CY = {{ cy }};
+
+{{ js }}</script>
+<button class="scan-fab" onclick="openScanDrawer()" title="Scan wine label">&#128247;</button>
+</body>
+</html>
