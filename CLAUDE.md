@@ -138,9 +138,12 @@ Each object in `consumed` has all the same fields as a wine (with `qty` always s
 "removedDate": "2026-05-11",   // ISO date string — when the bottle was logged as consumed
 "myRating": "good",            // optional — WSET SAT quality level: faulty | poor | acceptable | good | very good | outstanding
 "myNote": "Bright acidity..."  // optional — free-text tasting note
+"adhoc": true                  // optional — present only on entries logged via "Log Tasting" (never passed through WINES)
 ```
 
 `myRating` and `myNote` are captured via a rating modal at consumption time. Older consumed entries may lack these fields — the dashboard renders "—" when absent.
+
+Entries with `adhoc: true` were logged directly to `consumed` via the "Log Tasting" button without ever being added to the collection. They may have `null` values for `purchasePrice`, `purchasePriceEff`, `qprRaw`, `qprIndex`, `drinkFrom`, `drinkTo`, and `pairings` — this is expected and intentional. The Drinking History tab renders these gracefully and shows a small "tasting" badge next to the wine name.
 
 **QPR formula:**
 - `qprRaw = score / purchasePriceEff`
@@ -214,6 +217,10 @@ Derived fields (`qprRaw`, `qprIndex`, `purchasePriceEff`, `drinkStatus`) are com
 - Fill: `appellation`, `region`, `varietal`, `score`, `marketPrice`, `drinkFrom`, `drinkTo`, `pairings`, `summary`
 - Remove `"pending": true` flag if present
 - Regenerate the dashboard — derived fields fill themselves at page load
+
+**Log a tasting (ad-hoc, not from collection):**
+- In the dashboard UI: open the Edit drawer → Add Wine tab → fill in producer, wine, country, style (and optionally vintage, varietal, score, market price) → click "Log Tasting" → rate via the modal → entry goes directly to `CONSUMED` with `adhoc: true` and today's `removedDate`. The wine is never added to `WINES`.
+- Via JSON: append an object to `consumed` with `adhoc: true`, `qty: 1`, `removedDate`, and whatever fields are known. Fields like `purchasePrice`, `drinkFrom`, `drinkTo`, `pairings` may be null or omitted — that is correct for ad-hoc entries. Do not add to `wines`.
 
 **Remove a wine (mark as consumed):**
 - In the dashboard UI: click ✕ on a wine or use the minus button in the Edit drawer → a rating modal appears (WSET SAT level + optional tasting note) → on confirm, the wine moves to `CONSUMED` with today's date and any rating/note. If qty was > 1 and minus was used, only the qty decrements (wine stays in `WINES`); otherwise the wine is removed from `WINES` entirely.

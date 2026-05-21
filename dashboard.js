@@ -369,6 +369,71 @@ function addWine() {
   msg.textContent = "✓ Added \"" + wine + "\" — switch to Inventory to verify.";
   setTimeout(function(){msg.textContent="";}, 4000);
 }
+function logTasting() {
+  var producer = document.getElementById("f-producer").value.trim();
+  var wine = document.getElementById("f-wine").value.trim();
+  var country = document.getElementById("f-country").value;
+  var style = document.getElementById("f-style").value;
+  var msg = document.getElementById("add-msg");
+  if (!producer || !wine || !country || !style) {
+    msg.style.color = "#e05050";
+    msg.textContent = "Producer, Wine, Country and Style are required.";
+    return;
+  }
+  var appellation = document.getElementById("f-appellation").value.trim() || "";
+  var region = document.getElementById("f-region").value.trim() || country;
+  var varietal = document.getElementById("f-varietal").value.trim() || "";
+  var vintageRaw = document.getElementById("f-vintage").value;
+  var vintage = vintageRaw ? parseInt(vintageRaw) : "NV";
+  var marketPrice = parseFloat(document.getElementById("f-market").value) || null;
+  var score = parseInt(document.getElementById("f-score").value) || null;
+  var drinkFrom = parseInt(document.getElementById("f-from").value) || null;
+  var drinkTo = parseInt(document.getElementById("f-to").value) || null;
+  var allIds = WINES.map(function(w){return w.id;}).concat(CONSUMED.map(function(w){return w.id;}));
+  var newId = allIds.length ? Math.max.apply(null, allIds) + 1 : 1;
+  var pendingEntry = {
+    id: newId, producer: producer, wine: wine, appellation: appellation,
+    country: country, region: region, vintage: vintage, varietal: varietal,
+    style: style, score: score, marketPrice: marketPrice,
+    purchasePrice: null, purchasePriceEff: null, qprRaw: null, qprIndex: null,
+    drinkFrom: drinkFrom, drinkTo: drinkTo,
+    pairings: (window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length) ? window._scanPending.pairings : [],
+    summary: (window._scanPending && window._scanPending.summary) ? window._scanPending.summary : "",
+    qty: 1, adhoc: true
+  };
+  window._scanPending = null;
+  var overlay = document.getElementById("rateOverlay");
+  var nameEl = document.getElementById("rateWineName");
+  var noteEl = document.getElementById("rateNote");
+  nameEl.textContent = producer + " — " + wine + " (" + (typeof vintage === "string" ? "NV" : vintage) + ")";
+  noteEl.value = "";
+  var btns = document.querySelectorAll("#rateBtns .rate-btn");
+  btns.forEach(function(b){ b.classList.remove("selected"); b.onclick = function(){ btns.forEach(function(x){x.classList.remove("selected");}); b.classList.add("selected"); }; });
+  var confirmBtn = document.getElementById("rateConfirmBtn");
+  var cancelBtn = document.getElementById("rateCancelBtn");
+  confirmBtn.textContent = "Log Tasting";
+  overlay.classList.add("open");
+  function cleanup() { overlay.classList.remove("open"); confirmBtn.onclick = null; cancelBtn.onclick = null; }
+  cancelBtn.onclick = cleanup;
+  confirmBtn.onclick = function() {
+    var sel = document.querySelector("#rateBtns .rate-btn.selected");
+    var rating = sel ? sel.getAttribute("data-val") : null;
+    var note = noteEl.value.trim() || null;
+    var today = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date());
+    pendingEntry.removedDate = today;
+    if (rating) pendingEntry.myRating = rating;
+    if (note) pendingEntry.myNote = note;
+    CONSUMED.push(pendingEntry);
+    _logChange("✶ Tasting: " + producer + " — " + wine
+      + " (" + (typeof vintage === "string" ? "NV" : vintage) + ")"
+      + (rating ? " [" + rating + "]" : ""));
+    clearAddForm();
+    msg.style.color = "#4caf7a";
+    msg.textContent = "✓ Tasting logged — visible in Drinking History.";
+    setTimeout(function(){msg.textContent="";}, 4000);
+    cleanup();
+  };
+}
 function clearAddForm() {
   ["f-producer","f-wine","f-appellation","f-varietal","f-region"].forEach(function(id){document.getElementById(id).value="";});
   ["f-country","f-style"].forEach(function(id){document.getElementById(id).value="";});
@@ -426,14 +491,16 @@ function renderHistory() {
   var sorted = CONSUMED.slice().sort(function(a,b){ return (b.removedDate||"").localeCompare(a.removedDate||""); });
   body.innerHTML = sorted.map(function(w) {
     var vd = typeof w.vintage === "string" ? "NV" : w.vintage;
-    var score = w.score || "—";
+    var score = (w.score != null && w.score !== 0) ? w.score : "—";
     var style = w.style ? (w.style[0].toUpperCase() + w.style.slice(1)) : "—";
     var rating = w.myRating ? (w.myRating[0].toUpperCase() + w.myRating.slice(1)) : "—";
     var noteHtml = w.myNote ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;font-style:italic">' + w.myNote + '</div>' : '';
+    var subLine = w.appellation || w.region || w.country || "";
+    var tastingBadge = w.adhoc ? '<span style="font-size:9px;background:rgba(90,140,155,.18);color:#5a8c9b;border-radius:3px;padding:1px 5px;margin-left:5px;vertical-align:middle;letter-spacing:.3px">tasting</span>' : '';
     return '<tr>'
       + '<td style="color:var(--muted);white-space:nowrap">' + (w.removedDate || '—') + '</td>'
-      + '<td><div style="font-size:13px;color:var(--cream)">' + w.wine + '</div>'
-      + '<div style="font-size:11px;color:var(--muted)">' + w.producer + ' · ' + w.appellation + '</div></td>'
+      + '<td><div style="font-size:13px;color:var(--cream)">' + w.wine + tastingBadge + '</div>'
+      + '<div style="font-size:11px;color:var(--muted)">' + w.producer + (subLine ? ' · ' + subLine : '') + '</div></td>'
       + '<td style="color:var(--muted)">' + vd + '</td>'
       + '<td style="color:var(--muted)">' + style + '</td>'
       + '<td style="color:var(--gold);text-align:center">' + score + '</td>'
@@ -574,7 +641,7 @@ function _callGeminiVision(b64, mime, status, btn) {
       if (!wine.producer) throw new Error('Could not identify wine from this image');
       _fillFormFromScan(wine);
       status.className = 'scan-status-line ok';
-      status.textContent = '✓ Wine identified — review fields below, then click Add to Collection';
+      status.textContent = '✓ Wine identified — review fields below, then add to collection or log as a tasting';
       btn.disabled = false;
     })
     .catch(function(err) {

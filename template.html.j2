@@ -152,7 +152,7 @@
 <div id="history" class="section">
   <div class="narrative" style="margin-bottom:20px">
     <h2>Drinking History</h2>
-    <p>Wines removed from the collection, recorded in order of consumption. Date reflects when the bottle was logged as consumed in the dashboard.</p>
+    <p>Wines consumed from the collection, plus ad-hoc tastings logged directly. Date reflects when the entry was recorded in the dashboard.</p>
     <p style="margin-top:8px;font-size:13px;color:var(--muted)">Ratings use the WSET SAT quality scale (faulty through outstanding), weighing intensity, complexity, balance, finish, and typicity.</p>
   </div>
   <div id="historyEmpty" style="display:none;color:var(--muted);font-size:14px;padding:20px 0">No bottles consumed yet.</div>
@@ -257,6 +257,7 @@
       <p class="add-note">Fields marked * are required. Pairings and tasting notes will show as <span class="pending-badge">pending enrichment</span> &#8212; bring this file back to Claude to complete them.</p>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn-primary" onclick="addWine()">Add to Collection</button>
+        <button class="btn-secondary" onclick="logTasting()">Log Tasting</button>
         <button class="btn-secondary" onclick="clearAddForm()">Clear</button>
       </div>
       <div id="add-msg" style="margin-top:10px;font-size:12px;min-height:18px"></div>
