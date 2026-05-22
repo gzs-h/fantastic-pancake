@@ -222,6 +222,10 @@ Derived fields (`qprRaw`, `qprIndex`, `purchasePriceEff`, `drinkStatus`) are com
 - In the dashboard UI: open the Edit drawer → Add Wine tab → fill in producer, wine, country, style (and optionally vintage, varietal, score, market price) → click "Log Tasting" → rate via the modal → entry goes directly to `CONSUMED` with `adhoc: true` and today's `removedDate`. The wine is never added to `WINES`.
 - Via JSON: append an object to `consumed` with `adhoc: true`, `qty: 1`, `removedDate`, and whatever fields are known. Fields like `purchasePrice`, `drinkFrom`, `drinkTo`, `pairings` may be null or omitted — that is correct for ad-hoc entries. Do not add to `wines`.
 
+**Log a tasting from an existing collection wine (without consuming it):**
+- In the dashboard UI: open the Edit drawer → Inventory tab → click "tasting" on the wine row → rate via the modal. The wine data is copied from the existing `WINES` entry, an adhoc entry is written to `CONSUMED` with today's date, and qty is left unchanged.
+- Via JSON: same as the ad-hoc flow above, but copy all fields from the existing wine object and set `adhoc: true`, `qty: 1`, `removedDate`. Do not modify the source entry in `wines`.
+
 **Remove a wine (mark as consumed):**
 - In the dashboard UI: click ✕ on a wine or use the minus button in the Edit drawer → a rating modal appears (WSET SAT level + optional tasting note) → on confirm, the wine moves to `CONSUMED` with today's date and any rating/note. If qty was > 1 and minus was used, only the qty decrements (wine stays in `WINES`); otherwise the wine is removed from `WINES` entirely.
 - Via JSON: move the wine object from `wines` to `consumed`, add `"removedDate": "YYYY-MM-DD"` and optionally `"myRating"` and `"myNote"`, set `qty` to 1, recompute QPR across remaining `wines`, regenerate HTML

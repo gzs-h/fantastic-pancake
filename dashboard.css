@@ -90,6 +90,8 @@
   .qty-zero{opacity:.4}
   .remove-btn{background:none;border:1px solid transparent;color:var(--muted);cursor:pointer;padding:3px 7px;border-radius:3px;font-size:11px;transition:border-color .2s,color .2s;flex-shrink:0;font-family:Georgia,serif}
   .remove-btn:hover{border-color:#e05050;color:#e05050}
+  .tasting-link{background:none;border:1px solid transparent;color:var(--muted);cursor:pointer;padding:3px 7px;border-radius:3px;font-size:10px;letter-spacing:.3px;transition:border-color .2s,color .2s;flex-shrink:0;font-family:Georgia,serif}
+  .tasting-link:hover{border-color:#5a8c9b;color:#5a8c9b}
   .change-log{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px;min-height:80px;max-height:180px;overflow-y:auto;font-size:11px;color:var(--muted);font-family:monospace,monospace;line-height:1.6}
   .change-entry{padding:2px 0;border-bottom:1px solid rgba(58,37,53,.3)}
   .export-section h3{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:8px}

@@ -96,3 +96,5 @@ The scan fills in producer, wine, vintage, varietal, region, score, market price
 **Quick in-session edits** (qty adjustments, removals): use the Edit drawer in the dashboard, click Download Updated Dashboard, then run `python3 generate_dashboard.py --sync <html-file>` to write the changes back to `wines.json`. The JSON export button is available as a backup but isn't the standard path.
 
 **Logging an ad-hoc tasting** (wine not in your collection): Edit drawer → Add Wine tab → fill in the fields (or scan the label) → click "Log Tasting". A rating modal fires immediately. The entry lands in `consumed` with `adhoc: true` and never touches your active collection.
+
+**Logging a tasting from an existing collection wine** (without consuming it): Edit drawer → Inventory tab → click "tasting" on the wine row → rate via the modal. Qty is unchanged; an adhoc entry is written to `consumed` with the wine's existing data and today's date.

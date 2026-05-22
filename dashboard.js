@@ -251,6 +251,7 @@ function renderInvList() {
       + '<div class="inv-name">' + w.producer + ' — ' + w.wine + '</div>'
       + '<div class="inv-sub">' + vd + ' · ' + w.appellation + pb + '</div>'
       + '</div>'
+      + '<button class="tasting-link" onclick="logTastingFromWine(' + w.id + ')" title="Log a tasting">tasting</button>'
       + '<div class="qty-ctrl">'
       + '<button class="qty-btn" onclick="adjustQty(' + w.id + ',-1)">−</button>'
       + '<span class="qty-val' + zc + '">' + w.qty + '</span>'
@@ -281,6 +282,44 @@ function removeWine(id) {
   if (idx === -1) return;
   var w = WINES[idx];
   _openRateModal(w, idx);
+}
+function logTastingFromWine(id) {
+  var w = WINES.find(function(x){return x.id===id;});
+  if (!w) return;
+  var allIds = WINES.map(function(x){return x.id;}).concat(CONSUMED.map(function(x){return x.id;}));
+  var newId = allIds.length ? Math.max.apply(null, allIds) + 1 : 1;
+  var vintage = w.vintage;
+  var vd = typeof vintage === "string" ? "NV" : vintage;
+  var pendingEntry = Object.assign({}, w, {
+    id: newId, qty: 1, adhoc: true,
+    purchasePrice: null, purchasePriceEff: null, qprRaw: null, qprIndex: null
+  });
+  var overlay = document.getElementById("rateOverlay");
+  var nameEl = document.getElementById("rateWineName");
+  var noteEl = document.getElementById("rateNote");
+  nameEl.textContent = w.producer + " — " + w.wine + " (" + vd + ")";
+  noteEl.value = "";
+  var btns = document.querySelectorAll("#rateBtns .rate-btn");
+  btns.forEach(function(b){ b.classList.remove("selected"); b.onclick = function(){ btns.forEach(function(x){x.classList.remove("selected");}); b.classList.add("selected"); }; });
+  var confirmBtn = document.getElementById("rateConfirmBtn");
+  var cancelBtn = document.getElementById("rateCancelBtn");
+  confirmBtn.textContent = "Log Tasting";
+  overlay.classList.add("open");
+  function cleanup() { overlay.classList.remove("open"); confirmBtn.onclick = null; cancelBtn.onclick = null; }
+  cancelBtn.onclick = cleanup;
+  confirmBtn.onclick = function() {
+    var sel = document.querySelector("#rateBtns .rate-btn.selected");
+    var rating = sel ? sel.getAttribute("data-val") : null;
+    var note = noteEl.value.trim() || null;
+    var today = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date());
+    pendingEntry.removedDate = today;
+    if (rating) pendingEntry.myRating = rating;
+    if (note) pendingEntry.myNote = note;
+    CONSUMED.push(pendingEntry);
+    _logChange("✶ Tasting: " + w.producer + " — " + w.wine + " (" + vd + ")"
+      + (rating ? " [" + rating + "]" : ""));
+    cleanup();
+  };
 }
 function _openRateModal(w, idx, fromDecrement) {
   var overlay = document.getElementById("rateOverlay");
