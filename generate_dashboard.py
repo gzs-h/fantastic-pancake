@@ -87,7 +87,13 @@ def _sync_from_html(html_path):
     if new_wine_ids:
         print('  New wines: ' + ', '.join(str(i) for i in sorted(new_wine_ids)))
     if new_consumed_ids:
-        print('  New consumed: ' + ', '.join(str(i) for i in sorted(new_consumed_ids)))
+        html_consumed_map = {w['id']: w for w in html_consumed}
+        new_adhoc_ids = {i for i in new_consumed_ids if html_consumed_map.get(i, {}).get('adhoc')}
+        new_regular_consumed_ids = new_consumed_ids - new_adhoc_ids
+        if new_regular_consumed_ids:
+            print('  New consumed: ' + ', '.join(str(i) for i in sorted(new_regular_consumed_ids)))
+        if new_adhoc_ids:
+            print('  New tastings (ad-hoc, no data quality check needed): ' + ', '.join(str(i) for i in sorted(new_adhoc_ids)))
     if removed_ids:
         moved = removed_ids & html_consumed_ids
         gone = removed_ids - html_consumed_ids
