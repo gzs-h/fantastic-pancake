@@ -18,11 +18,15 @@ Curated narrative text lives in OVERVIEW_PARAS and GAP_ITEMS below.
 Update those when the collection changes significantly.
 """
 
+import io
 import json
 import os
 import re
 import sys
 import argparse
+import zipfile
+import urllib.request
+import urllib.error
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -394,3 +398,60 @@ print('Written: ' + out_path)
 print('  ' + str(sku_count) + ' SKUs, ' + str(total_bottles) + ' bottles, ' + str(country_count) + ' countries')
 print('  Market value: ' + mv_str)
 print('  Vintage span: ' + vintage_span)
+
+# ── deploy to Netlify (if netlify.env is configured) ─────────────────────────
+def _load_netlify_env():
+    """Read NETLIFY_SITE_ID and NETLIFY_TOKEN from netlify.env in the project folder."""
+    env_path = os.path.join(DIR, 'netlify.env')
+    if not os.path.isfile(env_path):
+        return None, None
+    cfg = {}
+    with open(env_path, 'r', encoding='utf-8') as _f:
+        for line in _f:
+            line = line.strip()
+            if '=' in line and not line.startswith('#'):
+                key, _, val = line.partition('=')
+                cfg[key.strip()] = val.strip()
+    site_id = cfg.get('NETLIFY_SITE_ID', '')
+    token = cfg.get('NETLIFY_TOKEN', '')
+    return site_id, token
+
+def _deploy_to_netlify(html_path):
+    """Zip the generated HTML as index.html and deploy to Netlify via the zip-deploy API."""
+    site_id, token = _load_netlify_env()
+    if not site_id or not token:
+        return  # netlify.env missing or incomplete — skip silently
+    if token == 'YOUR_TOKEN_HERE':
+        print('Netlify: token not set — edit netlify.env to add your personal access token.')
+        return
+
+    # Build zip in memory with the HTML file as index.html
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.write(html_path, 'index.html')
+    buf.seek(0)
+    payload = buf.read()
+
+    url = 'https://api.netlify.com/api/v1/sites/' + site_id + '/deploys'
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            'Content-Type': 'application/zip',
+            'Authorization': 'Bearer ' + token,
+        },
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+        deploy_url = result.get('deploy_ssl_url') or result.get('ssl_url') or result.get('url', '')
+        state = result.get('state', '')
+        print('Netlify: deployed — ' + (deploy_url or ('state=' + state)))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        print('Netlify deploy failed (' + str(e.code) + '): ' + body[:200])
+    except Exception as e:
+        print('Netlify deploy error: ' + str(e))
+
+_deploy_to_netlify(out_path)
