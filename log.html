@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log a Tasting</title>
+<style>
+  :root {
+    --bg:#0f0a0e;--surface:#1a1118;--surface2:#231820;--border:#3a2535;
+    --burgundy:#7c2d3f;--gold:#c9a84c;--gold-light:#e8c97a;--cream:#f0e6d3;
+    --text:#e8ddd0;--muted:#9b8a7a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Georgia, serif;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  /* ── HEADER ── */
+  .page-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .page-title {
+    font-size: 15px;
+    letter-spacing: 1px;
+    color: var(--gold);
+    font-variant: small-caps;
+  }
+  .back-link {
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: .5px;
+    transition: color .2s;
+  }
+  .back-link:hover { color: var(--gold); }
+
+  /* ── DRAFT BANNER ── */
+  .draft-banner {
+    display: none;
+    background: rgba(201,168,76,.12);
+    border: 1px solid var(--gold);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 16px 20px 0;
+    font-size: 13px;
+    color: var(--gold);
+    line-height: 1.45;
+  }
+  .draft-banner.visible { display: block; }
+
+  /* ── MAIN FORM ── */
+  .form-wrap {
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ── SCAN SECTION ── */
+  .scan-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .scan-btn-full {
+    width: 100%;
+    padding: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    letter-spacing: .5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background .2s, opacity .2s;
+    min-height: 44px;
+  }
+  .scan-btn-full:hover { background: rgba(201,168,76,.08); }
+  .scan-btn-full:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; opacity: .5; }
+
+  .scan-status-line {
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 18px;
+    margin: 8px 0 0;
+    text-align: center;
+    line-height: 1.4;
+  }
+  .scan-status-line.ok { color: #4caf7a; }
+  .scan-status-line.err { color: #e07830; }
+
+  .scan-footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  .key-link {
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .2s;
+    user-select: none;
+  }
+  .key-link:hover { color: var(--gold); }
+
+  .key-area-inner {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 8px;
+  }
+  .key-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .key-row input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: Georgia, serif;
+    outline: none;
+    min-height: 44px;
+  }
+  .key-row input:focus { border-color: var(--gold); }
+
+  /* ── FIELD SECTIONS ── */
+  .field-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 14px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 14px;
+  }
+  .form-group:last-child { margin-bottom: 0; }
+  .form-group label {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 12px;
+    border-radius: 4px;
+    font-size: 16px;   /* prevents iOS auto-zoom */
+    font-family: Georgia, serif;
+    outline: none;
+    min-height: 44px;
+    width: 100%;
+    transition: border-color .2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .form-group select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239b8a7a' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+  .form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus { border-color: var(--gold); }
+
+  /* ── SUBMIT ── */
+  .submit-section {
+    margin-top: 4px;
+  }
+  .btn-submit {
+    width: 100%;
+    padding: 16px;
+    background: var(--burgundy);
+    border: 1px solid var(--burgundy);
+    color: var(--cream);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    letter-spacing: 1px;
+    font-variant: small-caps;
+    transition: background .2s;
+    min-height: 52px;
+  }
+  .btn-submit:hover { background: #a03050; }
+  .btn-submit:disabled { opacity: .6; cursor: not-allowed; }
+
+  .status-msg {
+    margin-top: 12px;
+    font-size: 13px;
+    min-height: 20px;
+    text-align: center;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .status-msg.ok { color: #4caf7a; }
+  .status-msg.err { color: #e07830; }
+
+  /* ── UTILITY ── */
+  .btn-sm {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    letter-spacing: .5px;
+    font-variant: small-caps;
+    transition: border-color .2s, color .2s;
+    font-family: Georgia, serif;
+    min-height: 44px;
+  }
+  .btn-sm:hover { border-color: var(--gold); color: var(--gold); }
+
+  .spin {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: _spin .8s linear infinite;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  @keyframes _spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <span class="page-title">&#9670;&nbsp;Log a Tasting</span>
+  <a class="back-link" href="/">&#8592; View collection</a>
+</header>
+
+<div class="draft-banner" id="draftBanner">
+  You have an unsaved tasting. Review and submit when you have signal.
+</div>
+
+<div class="form-wrap">
+
+  <!-- Scan section -->
+  <div class="scan-section">
+    <button class="scan-btn-full" id="scanBtn" onclick="scanLabel()">&#128247;&nbsp;Scan Label</button>
+    <input type="file" id="scanInput" accept="image/*" capture="environment"
+           style="display:none" onchange="handleScanFile(this)">
+    <div class="scan-status-line" id="scanStatus"></div>
+    <div id="keyArea" style="display:none">
+      <div class="key-area-inner">
+        <div class="key-row">
+          <input type="password" id="keyInput" placeholder="Paste Gemini API key&#8230;">
+          <button class="btn-sm" onclick="saveKey()">Save</button>
+          <button class="btn-sm" onclick="clearKey()" style="color:#e05050">Clear</button>
+        </div>
+      </div>
+    </div>
+    <div class="scan-footer-row">
+      <span id="keyStatusLine" style="color:var(--muted)">&#8212;</span>
+      <span class="key-link" onclick="toggleKeyArea()">&#9881;&nbsp;API key</span>
+    </div>
+  </div>
+
+  <!-- Tasting form -->
+  <form name="tasting-log" method="POST" data-netlify="true" id="tastingForm">
+    <input type="hidden" name="form-name" value="tasting-log">
+
+    <!-- Hidden scan-populated fields -->
+    <input type="hidden" name="varietal" id="h-varietal">
+    <input type="hidden" name="appellation" id="h-appellation">
+    <input type="hidden" name="region" id="h-region">
+    <input type="hidden" name="score" id="h-score">
+    <input type="hidden" name="marketPrice" id="h-marketPrice">
+    <input type="hidden" name="drinkFrom" id="h-drinkFrom">
+    <input type="hidden" name="drinkTo" id="h-drinkTo">
+    <input type="hidden" name="pairings" id="h-pairings">
+    <input type="hidden" name="summary" id="h-summary">
+
+    <!-- Wine identity -->
+    <div class="field-section">
+      <div class="section-label">Wine</div>
+      <div class="form-group">
+        <label for="f-producer">Producer *</label>
+        <input type="text" id="f-producer" name="producer" placeholder="e.g. Domaine Leflaive" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="f-wine">Wine Name *</label>
+        <input type="text" id="f-wine" name="wine" placeholder="e.g. Puligny-Montrachet" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="f-vintage">Vintage</label>
+        <input type="number" id="f-vintage" name="vintage" placeholder="e.g. 2019" min="1900" max="2030" inputmode="numeric">
+      </div>
+      <div class="form-group">
+        <label for="f-country">Country *</label>
+        <select id="f-country" name="country" required>
+          <option value="">Select&#8230;</option>
+          <option>France</option><option>USA</option><option>Italy</option>
+          <option>Germany</option><option>Argentina</option><option>Chile</option>
+          <option>Australia</option><option>Spain</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="f-style">Style *</label>
+        <select id="f-style" name="style" required>
+          <option value="">Select&#8230;</option>
+          <option value="red">Red</option>
+          <option value="white">White</option>
+          <option value="sparkling">Sparkling</option>
+          <option value="ros&#233;">Ros&#233;</option>
+          <option value="dessert">Dessert</option>
+          <option value="orange">Orange</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tasting notes -->
+    <div class="field-section">
+      <div class="section-label">Tasting Notes</div>
+      <div class="form-group">
+        <label for="f-date">Date *</label>
+        <input type="date" id="f-date" name="date" required>
+      </div>
+      <div class="form-group">
+        <label for="f-rating">My Rating</label>
+        <select id="f-rating" name="myRating">
+          <option value="">&#8212; no rating &#8212;</option>
+          <option value="faulty">Faulty</option>
+          <option value="poor">Poor</option>
+          <option value="acceptable">Acceptable</option>
+          <option value="good">Good</option>
+          <option value="very good">Very Good</option>
+          <option value="outstanding">Outstanding</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="f-note">Tasting Note</label>
+        <textarea id="f-note" name="myNote" placeholder="Aromas, palate, finish&#8230;"></textarea>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="submit-section">
+      <button type="submit" class="btn-submit" id="submitBtn">Submit Tasting</button>
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+  </form>
+
+</div><!-- /.form-wrap -->
+
+<script>
+// ── SCAN LABEL (copied verbatim from dashboard.js) ──────────────────────────
+
+function _scanKey() {
+  try { return localStorage.getItem('gemini_api_key') || ''; } catch(e) { return ''; }
+}
+function _updateKeyStatus() {
+  var k = _scanKey();
+  var el = document.getElementById('keyStatusLine');
+  var btn = document.getElementById('scanBtn');
+  if (el) { el.textContent = k ? '✓ API key set' : 'No API key'; el.style.color = k ? '#4caf7a' : 'var(--muted)'; }
+  if (btn) btn.disabled = !k;
+}
+function toggleKeyArea() {
+  var el = document.getElementById('keyArea');
+  if (!el) return;
+  var showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (!showing) { var ki = document.getElementById('keyInput'); if (ki) ki.focus(); }
+}
+function saveKey() {
+  var val = (document.getElementById('keyInput') || {}).value || '';
+  val = val.trim();
+  if (!val) return;
+  try { localStorage.setItem('gemini_api_key', val); } catch(e) {}
+  document.getElementById('keyInput').value = '';
+  document.getElementById('keyArea').style.display = 'none';
+  _updateKeyStatus();
+}
+function clearKey() {
+  try { localStorage.removeItem('gemini_api_key'); } catch(e) {}
+  var ki = document.getElementById('keyInput');
+  if (ki) ki.value = '';
+  _updateKeyStatus();
+}
+function scanLabel() {
+  var k = _scanKey();
+  if (!k) {
+    toggleKeyArea();
+    var ss = document.getElementById('scanStatus');
+    if (ss) { ss.className = 'scan-status-line err'; ss.textContent = 'Set your Gemini API key first.'; }
+    return;
+  }
+  var inp = document.getElementById('scanInput');
+  if (inp) inp.click();
+}
+function handleScanFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var status = document.getElementById('scanStatus');
+  var btn = document.getElementById('scanBtn');
+  status.className = 'scan-status-line';
+  status.innerHTML = '<span class="spin"></span> Identifying wine…';
+  btn.disabled = true;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result.split(',')[1];
+    var mime = file.type || 'image/jpeg';
+    _callGeminiVision(b64, mime, status, btn);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+function _callGeminiVision(b64, mime, status, btn) {
+  var key = _scanKey();
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
+  var prompt = 'You are a wine expert examining a wine bottle label photo.\n\nExtract every detail you can identify from the label. Then, using your wine knowledge, fill in the remaining fields needed for a wine cellar database.\n\nReturn ONLY a JSON object with these exact fields (no markdown, no explanation):\n{"producer":"...","wine":"...","appellation":"...","country":"...","region":"...","vintage":2023,"varietal":"...","style":"red","purchasePrice":null,"marketPrice":25,"score":88,"drinkFrom":2024,"drinkTo":2030,"pairings":["food1","food2","food3"],"summary":"2-3 sentence tasting note and context."}\n\nRules:\n- vintage must be an integer year, or the string NV for non-vintage\n- style must be one of: red, white, sparkling, rosé, dessert, orange\n- marketPrice is your best estimate of current US retail price in USD\n- score is your best estimate of critic consensus (Wine Advocate, Wine Spectator)\n- drinkFrom and drinkTo are drinking window years\n- pairings should be 3 specific food pairings\n- summary should mention the producer, vintage character, and what to expect\n- purchasePrice should always be null\n- If you cannot identify the wine at all, set producer to null';
+  var body = JSON.stringify({ contents: [{ parts: [
+    { inline_data: { mime_type: mime, data: b64 } },
+    { text: prompt }
+  ]}]});
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) throw new Error(data.error.message || 'API error');
+      var candidates = data.candidates || [];
+      var content = (candidates[0] || {}).content || {};
+      var parts = content.parts || [];
+      var text = ((parts[0] || {}).text || '').trim();
+      if (text.indexOf('```') === 0) {
+        text = text.split('\n').slice(1).join('\n');
+        text = text.replace(/```\s*$/, '').trim();
+      }
+      var wine = JSON.parse(text);
+      if (!wine.producer) throw new Error('Could not identify wine from this image');
+      _fillFormFromScan(wine);
+      status.className = 'scan-status-line ok';
+      status.textContent = '✓ Wine identified — review fields below, then submit';
+      btn.disabled = false;
+    })
+    .catch(function(err) {
+      status.className = 'scan-status-line err';
+      status.textContent = 'Scan failed: ' + err.message;
+      btn.disabled = false;
+    });
+}
+
+// ── FILL FORM FROM SCAN (log.html version — populates visible + hidden fields) ──
+function _fillFormFromScan(w) {
+  function setVal(id, val) { var el = document.getElementById(id); if (el && val != null) el.value = val; }
+  // Visible fields
+  setVal('f-producer', w.producer || '');
+  setVal('f-wine', w.wine || '');
+  setVal('f-vintage', typeof w.vintage === 'number' ? w.vintage : '');
+  // Country select — match by value or text
+  var cEl = document.getElementById('f-country');
+  if (cEl && w.country) {
+    for (var i = 0; i < cEl.options.length; i++) {
+      if (cEl.options[i].value === w.country || cEl.options[i].text === w.country) { cEl.selectedIndex = i; break; }
+    }
+  }
+  // Style select
+  var sEl = document.getElementById('f-style');
+  if (sEl && w.style) sEl.value = w.style;
+  // Hidden fields — scan-returned data
+  setVal('h-varietal',     w.varietal || '');
+  setVal('h-appellation',  w.appellation || '');
+  setVal('h-region',       w.region || '');
+  setVal('h-score',        w.score != null ? w.score : '');
+  setVal('h-marketPrice',  w.marketPrice != null ? w.marketPrice : '');
+  setVal('h-drinkFrom',    w.drinkFrom != null ? w.drinkFrom : '');
+  setVal('h-drinkTo',      w.drinkTo != null ? w.drinkTo : '');
+  setVal('h-pairings',     (w.pairings && w.pairings.length) ? JSON.stringify(w.pairings) : '');
+  setVal('h-summary',      w.summary || '');
+}
+
+// ── DRAFT PERSISTENCE ────────────────────────────────────────────────────────
+var DRAFT_KEY = 'tasting_draft';
+// All field IDs to save/restore (visible + hidden)
+var DRAFT_FIELDS = [
+  'f-producer','f-wine','f-vintage','f-country','f-style',
+  'f-date','f-rating','f-note',
+  'h-varietal','h-appellation','h-region','h-score',
+  'h-marketPrice','h-drinkFrom','h-drinkTo','h-pairings','h-summary'
+];
+
+function saveDraft() {
+  var draft = {};
+  DRAFT_FIELDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) draft[id] = el.value;
+  });
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch(e) {}
+}
+
+function restoreDraft() {
+  var raw;
+  try { raw = localStorage.getItem(DRAFT_KEY); } catch(e) { return; }
+  if (!raw) return;
+  var draft;
+  try { draft = JSON.parse(raw); } catch(e) { return; }
+  DRAFT_FIELDS.forEach(function(id) {
+    if (draft[id] == null) return;
+    var el = document.getElementById(id);
+    if (el) el.value = draft[id];
+  });
+  document.getElementById('draftBanner').classList.add('visible');
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch(e) {}
+  document.getElementById('draftBanner').classList.remove('visible');
+}
+
+// ── FORM SUBMISSION ──────────────────────────────────────────────────────────
+var form = document.getElementById('tastingForm');
+var statusMsg = document.getElementById('statusMsg');
+var submitBtn = document.getElementById('submitBtn');
+
+form.addEventListener('submit', function(e) {
+  e.preventDefault();
+  submitBtn.disabled = true;
+  statusMsg.className = 'status-msg';
+  statusMsg.innerHTML = '<span class="spin"></span> Submitting…';
+
+  var data = new FormData(form);
+  fetch('/', { method: 'POST', body: data })
+    .then(function() {
+      statusMsg.className = 'status-msg ok';
+      statusMsg.textContent = '✓ Tasting logged successfully!';
+      form.reset();
+      // Restore today's date after reset
+      document.getElementById('f-date').value = _todayISO();
+      clearDraft();
+      submitBtn.disabled = false;
+    })
+    .catch(function(err) {
+      saveDraft();
+      statusMsg.className = 'status-msg err';
+      statusMsg.textContent = 'Submission failed — your entry has been saved. Tap Submit again when you have signal.';
+      submitBtn.disabled = false;
+    });
+});
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+function _todayISO() {
+  var d = new Date();
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + mm + '-' + dd;
+}
+
+// Set today's date as default
+document.getElementById('f-date').value = _todayISO();
+
+// Restore any saved draft
+restoreDraft();
+
+// Initialise API key status
+_updateKeyStatus();
+</script>
+</body>
+</html>

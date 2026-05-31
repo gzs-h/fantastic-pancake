@@ -144,10 +144,199 @@ def _sync_from_html(html_path):
 _parser = argparse.ArgumentParser(description='Generate wine cellar dashboard HTML.')
 _parser.add_argument('--sync', metavar='HTML_FILE',
                      help='Sync wines.json from an exported dashboard HTML before generating.')
+_parser.add_argument('--pull-forms', action='store_true',
+                     help='Pull pending Netlify Forms tasting submissions into wines.json.')
 _args = _parser.parse_args()
 
 if _args.sync:
     _sync_from_html(_args.sync)
+
+# ── Netlify helpers (used by both --pull-forms and deploy) ───────────────────
+def _load_netlify_env():
+    """Read NETLIFY_SITE_ID and NETLIFY_TOKEN from netlify.env in the project folder."""
+    env_path = os.path.join(DIR, 'netlify.env')
+    if not os.path.isfile(env_path):
+        return None, None
+    cfg = {}
+    with open(env_path, 'r', encoding='utf-8') as _f:
+        for line in _f:
+            line = line.strip()
+            if '=' in line and not line.startswith('#'):
+                key, _, val = line.partition('=')
+                cfg[key.strip()] = val.strip()
+    site_id = cfg.get('NETLIFY_SITE_ID', '')
+    token = cfg.get('NETLIFY_TOKEN', '')
+    return site_id, token
+
+# ── pull Netlify Forms submissions (--pull-forms flag) ───────────────────────
+def _pull_netlify_forms():
+    """Fetch new Netlify Forms tasting submissions and append them to wines.json."""
+    site_id, token = _load_netlify_env()
+    if not site_id or not token or token == 'YOUR_TOKEN_HERE':
+        print('--pull-forms: netlify.env missing or token not set — skipping.')
+        return
+
+    state_path = os.path.join(DIR, 'netlify_forms_state.json')
+
+    # Step 1 — Load state
+    if os.path.exists(state_path):
+        with open(state_path, 'r', encoding='utf-8') as _f:
+            _state = json.load(_f)
+    else:
+        _state = {}
+    processed_ids = set(_state.get('processed_ids', []))
+
+    headers = {'Authorization': 'Bearer ' + token}
+
+    def _netlify_get(url):
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+
+    # Step 2 — Discover form ID
+    try:
+        forms = _netlify_get('https://api.netlify.com/api/v1/sites/' + site_id + '/forms')
+    except Exception as e:
+        print('--pull-forms: could not list forms: ' + str(e))
+        return
+    form_id = None
+    for frm in forms:
+        if frm.get('name') == 'tasting-log':
+            form_id = frm['id']
+            break
+    if not form_id:
+        print('--pull-forms: "tasting-log" form not found yet (deploy log.html first).')
+        return
+
+    # Step 3 — Fetch submissions with pagination
+    all_submissions = []
+    page = 1
+    while True:
+        try:
+            page_data = _netlify_get(
+                'https://api.netlify.com/api/v1/forms/' + form_id + '/submissions?page=' + str(page)
+            )
+        except Exception as e:
+            print('--pull-forms: error fetching submissions page ' + str(page) + ': ' + str(e))
+            break
+        if not page_data:
+            break
+        all_submissions.extend(page_data)
+        if len(page_data) < 100:
+            break
+        page += 1
+
+    new_submissions = [s for s in all_submissions if s['id'] not in processed_ids]
+    if not new_submissions:
+        print('--pull-forms: 0 new submissions.')
+        return
+
+    # Load current wines.json
+    if os.path.exists(JSON_PATH):
+        with open(JSON_PATH, 'r', encoding='utf-8') as _f:
+            _raw2 = json.load(_f)
+        if isinstance(_raw2, list):
+            _wines2, _consumed2 = _raw2, []
+        else:
+            _wines2 = _raw2.get('wines', [])
+            _consumed2 = _raw2.get('consumed', [])
+    else:
+        _wines2, _consumed2 = [], []
+
+    def _parse_int_or_none(val):
+        try: return int(val)
+        except (TypeError, ValueError): return None
+
+    def _parse_float_or_none(val):
+        try: return float(val)
+        except (TypeError, ValueError): return None
+
+    def _parse_json_or_none(val):
+        if not val: return None
+        try: return json.loads(val)
+        except (TypeError, json.JSONDecodeError): return None
+
+    # Step 4 — Convert to consumed entries
+    all_ids = [w['id'] for w in _wines2] + [c['id'] for c in _consumed2]
+    next_id = (max(all_ids) if all_ids else 0) + 1
+
+    # Secondary dedup: set of (producer, wine, vintage, removedDate) already in consumed
+    existing_keys = set()
+    for c in _consumed2:
+        existing_keys.add((
+            (c.get('producer') or '').lower(),
+            (c.get('wine') or '').lower(),
+            str(c.get('vintage', '')),
+            str(c.get('removedDate', '')),
+        ))
+
+    new_entries = []
+    new_processed_ids = []
+    for sub in new_submissions:
+        data = sub.get('data', {})
+        removed_date = data.get('date') or sub.get('created_at', '')[:10]
+        vintage_raw = _parse_int_or_none(data.get('vintage'))
+        vintage = vintage_raw if vintage_raw is not None else 'NV'
+        dedup_key = (
+            (data.get('producer') or '').lower(),
+            (data.get('wine') or '').lower(),
+            str(vintage),
+            str(removed_date),
+        )
+        if dedup_key in existing_keys:
+            print('  Skipping duplicate: ' + str(data.get('producer')) + ' ' + str(data.get('wine')) + ' (' + str(removed_date) + ')')
+            new_processed_ids.append(sub['id'])
+            continue
+        entry = {
+            'id': next_id,
+            'producer': data.get('producer', ''),
+            'wine': data.get('wine', ''),
+            'vintage': vintage,
+            'country': data.get('country', ''),
+            'style': data.get('style', 'red'),
+            'qty': 1,
+            'removedDate': removed_date,
+            'myRating': data.get('myRating') or None,
+            'myNote': data.get('myNote') or None,
+            'adhoc': True,
+            'purchasePrice': None,
+            'purchasePriceEff': None,
+            'qprRaw': None,
+            'qprIndex': None,
+            'varietal': data.get('varietal', ''),
+            'appellation': data.get('appellation', ''),
+            'region': data.get('region', ''),
+            'score': _parse_int_or_none(data.get('score')),
+            'marketPrice': _parse_float_or_none(data.get('marketPrice')),
+            'drinkFrom': _parse_int_or_none(data.get('drinkFrom')),
+            'drinkTo': _parse_int_or_none(data.get('drinkTo')),
+            'pairings': _parse_json_or_none(data.get('pairings')),
+            'summary': data.get('summary', ''),
+        }
+        new_entries.append(entry)
+        new_processed_ids.append(sub['id'])
+        existing_keys.add(dedup_key)
+        next_id += 1
+
+    if not new_entries:
+        print('--pull-forms: all new submissions were duplicates — nothing added.')
+    else:
+        # Step 5 — Merge and write
+        _consumed2.extend(new_entries)
+        with open(JSON_PATH, 'w', encoding='utf-8') as _f:
+            json.dump({'wines': _wines2, 'consumed': _consumed2}, _f, indent=2, ensure_ascii=False)
+        print('Pulled ' + str(len(new_entries)) + ' tasting submission(s) from Netlify Forms.')
+        for e in new_entries:
+            print('  → ' + e['producer'] + ' ' + e['wine'] + ' (' + str(e['removedDate']) + ')')
+
+    # Step 6 — Update state
+    processed_ids.update(new_processed_ids)
+    _state['processed_ids'] = sorted(processed_ids)
+    with open(state_path, 'w', encoding='utf-8') as _f:
+        json.dump(_state, _f, indent=2)
+
+if _args.pull_forms:
+    _pull_netlify_forms()
 
 with open(JSON_PATH, 'r', encoding='utf-8') as f:
     _raw = json.load(f)
@@ -407,22 +596,6 @@ print('  Market value: ' + mv_str)
 print('  Vintage span: ' + vintage_span)
 
 # ── deploy to Netlify (if netlify.env is configured) ─────────────────────────
-def _load_netlify_env():
-    """Read NETLIFY_SITE_ID and NETLIFY_TOKEN from netlify.env in the project folder."""
-    env_path = os.path.join(DIR, 'netlify.env')
-    if not os.path.isfile(env_path):
-        return None, None
-    cfg = {}
-    with open(env_path, 'r', encoding='utf-8') as _f:
-        for line in _f:
-            line = line.strip()
-            if '=' in line and not line.startswith('#'):
-                key, _, val = line.partition('=')
-                cfg[key.strip()] = val.strip()
-    site_id = cfg.get('NETLIFY_SITE_ID', '')
-    token = cfg.get('NETLIFY_TOKEN', '')
-    return site_id, token
-
 def _deploy_to_netlify(html_path):
     """Zip the generated HTML as index.html and deploy to Netlify via the zip-deploy API."""
     site_id, token = _load_netlify_env()
@@ -432,12 +605,18 @@ def _deploy_to_netlify(html_path):
         print('Netlify: token not set — edit netlify.env to add your personal access token.')
         return
 
-    # Build zip in memory: index.html + _headers to force correct content-type
-    _headers_content = '/index.html\n  Content-Type: text/html; charset=utf-8\n'
+    # Build zip in memory: index.html + log.html (if present) + _headers
+    _headers_content = (
+        '/index.html\n  Content-Type: text/html; charset=utf-8\n'
+        '/log.html\n  Content-Type: text/html; charset=utf-8\n'
+    )
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(html_path, 'index.html')
         zf.writestr('_headers', _headers_content)
+        log_path = os.path.join(DIR, 'log.html')
+        if os.path.exists(log_path):
+            zf.write(log_path, 'log.html')
     buf.seek(0)
     payload = buf.read()
 
