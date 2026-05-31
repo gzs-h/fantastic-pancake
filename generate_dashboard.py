@@ -252,17 +252,23 @@ consumed_styles_str = ', '.join(consumed_style_parts) if consumed_style_parts el
 # ── curated narrative (update when collection changes significantly) ───────────
 OVERVIEW_PARAS = [
     ('This is a {bottles}-bottle collection of genuine range and ambition &mdash; a highly curious taster\'s '
-     'working library spanning eight countries and five decades of vintages. The French backbone is broad: '
-     'Burgundy from village-level Marsannay (Domaine Collotte) through Premier Cru Nuits-Saint-Georges '
-     '(Albert Bichot, Esprit de Leflaive) and Grand Cru Gevrey-Chambertin (Louis Jadot Clos Saint-Jacques), '
-     'Bordeaux (Kirkland value plays and a 1988 Rieussec), '
-     'Alsace (Trimbach Cuvée Fr&eacute;d&eacute;ric Emile in magnum), Loire (Saumur Blanc, Cour-Cheverny), '
-     'Jura (Domaine Labet), Beaujolais, Bandol, Ch&acirc;teauneuf-du-Pape, Provence, and a well-stocked '
-     'Champagne shelf including Laherte Fr&egrave;res and Tarlant. '
+     'working library spanning nine countries and five decades of vintages. The French backbone is broad: '
+     'Burgundy from village-level Marsannay (Domaine Collotte) and Hautes-C&ocirc;tes de Nuits (JJ Archambaud) '
+     'through Premier Cru Nuits-Saint-Georges (Albert Bichot, Esprit de Leflaive) and the storied Premier Cru '
+     'Gevrey-Chambertin Clos Saint-Jacques (Louis Jadot), '
+     'Bordeaux (Kirkland Pauillac and Saint-&Eacute;milion, plus a 1988 Rieussec Sauternes), '
+     'Alsace (Trimbach Cuvée Fr&eacute;d&eacute;ric Emile in magnum), Loire (Saumur Blanc from Clotilde Legrand), '
+     'Jura (Domaine Labet), a deepened Beaujolais shelf (Domaine de la Madone and Pierre-Marie Chermette Brouilly), '
+     'Bandol and Provence (Domaine Tempier, Clos Cibonne, Bi&eacute;ler P&egrave;re &amp; Fils), '
+     'Ch&acirc;teauneuf-du-Pape (Berthet-Rayne), and Champagne (Laherte Fr&egrave;res, Tarlant, Caz&eacute;-Thibaut). '
+     'Italy contributes four bottles: Cesari Amarone, Michele Chiarlo Tortoniano (Barolo), Lamole di Lamole '
+     'Chianti Classico, and Campo al Mare. '
      'The American contingent is equally serious: a deep Littorai program spanning Pinot Noir, Chardonnay, '
      'Chenin Blanc, and Vin Gris; weighty Napa Cabernet (Heitz Martha\'s, Heitz Trailside, Nickel &amp; Nickel, '
-     'Ashes &amp; Diamonds); Ultramarine and Domaine Carneros on the sparkling side; and Pacific Northwest '
-     'coverage via Amity, Ch&acirc;teau La Caille, Hiyu Wine Farm, and Fossil &amp; Fawn.'
+     'Ashes &amp; Diamonds Cab Franc); Ultramarine and Domaine Carneros on the sparkling side; '
+     'Hirsch Vineyards on the Sonoma Coast; and Pacific Northwest coverage via Amity, '
+     'Ch&acirc;teau La Caille (Columbia Valley), and Hiyu Wine Farm. '
+     'Black Ankle Vineyards adds a Maryland Syrah as a regional outlier.'
     ).format(bottles=total_bottles),
 
     ('A standout thread is the RNDC Wine Library &mdash; bottles acquired at ~$18/btl that include '
@@ -296,22 +302,23 @@ OVERVIEW_PARAS = [
 GAP_ITEMS = [
     ('Whites still the thinnest category',
      'Now ' + str(white_count) + ' white SKUs &mdash; up from earlier, with Littorai Chardonnays, '
-     'Haven Chenin Blanc, Keller Alte Reben Reserve, Domaine Labet, Fossil &amp; Fawn, and V&eacute;rit&eacute; '
+     'Haven Chenin Blanc, Keller Alte Reben Reserve, Domaine Labet, and V&eacute;rit&eacute; '
      'Le Diamant filling gaps. But white Burgundy (Meursault, Puligny-Montrachet) and Loire '
      '(Vouvray, Saveni&egrave;res) remain unrepresented.'),
     ('Northern Rh&ocirc;ne absent',
      'Hermitage, Cornas, Crozes-Hermitage, and Condrieu are missing &mdash; a meaningful gap for a '
      'collection this geographically ambitious. The Southern Rh&ocirc;ne has Ch&acirc;teauneuf '
      '(Berthet-Rayne) and Pasquiers Prebayon, but the North remains a blank.'),
-    ('Spain completely absent',
-     'No Rioja, Ribera del Duero, Priorat, or Bierzo &mdash; regions that complement the existing '
+    ('Spain a token presence',
+     'One Catalan ros&eacute; (Bodega Can Feliu) is now in the collection, but Rioja, Ribera del Duero, '
+     'Priorat, and Bierzo remain absent &mdash; regions that complement the existing '
      'Menc&iacute;a and Grenache threads and typically offer strong QPR.'),
     ('Very limited aged inventory',
      'Pre-2010 bottles: ' + pre2010_names + '. Nearly all other wines are 2018 or newer. '
      'Mid-tier aged reds (2010&ndash;2015 Burgundy, Bordeaux, Barolo, or Rioja) for near-term '
      'drinking are largely absent.'),
     ('Pacific Northwest expanding but still selective',
-     'Oregon now has Amity and Fossil &amp; Fawn; Washington has Ch&acirc;teau La Caille and '
+     'Oregon has Amity; Washington has Ch&acirc;teau La Caille (Columbia Valley) and '
      'Hiyu Wine Farm. But Willamette Valley heavyweights (Domaine Drouhin, Eyrie, Ponzi, Cristom) '
      'remain absent, as does any Columbia Valley Syrah.'),
     ('Almost exclusively single-bottle positions',
@@ -425,10 +432,12 @@ def _deploy_to_netlify(html_path):
         print('Netlify: token not set — edit netlify.env to add your personal access token.')
         return
 
-    # Build zip in memory with the HTML file as index.html
+    # Build zip in memory: index.html + _headers to force correct content-type
+    _headers_content = '/index.html\n  Content-Type: text/html; charset=utf-8\n'
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(html_path, 'index.html')
+        zf.writestr('_headers', _headers_content)
     buf.seek(0)
     payload = buf.read()
 
@@ -445,9 +454,10 @@ def _deploy_to_netlify(html_path):
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read().decode('utf-8'))
-        deploy_url = result.get('deploy_ssl_url') or result.get('ssl_url') or result.get('url', '')
+        # ssl_url is the stable site URL; deploy_ssl_url is the deploy-specific preview URL
+        site_url = result.get('ssl_url') or result.get('url', '')
         state = result.get('state', '')
-        print('Netlify: deployed — ' + (deploy_url or ('state=' + state)))
+        print('Netlify: deployed — ' + (site_url or ('state=' + state)))
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')
         print('Netlify deploy failed (' + str(e.code) + '): ' + body[:200])
