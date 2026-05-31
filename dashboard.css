@@ -165,7 +165,7 @@
   .qpr-bar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
   .qpr-track{width:60px;height:4px;background:var(--border);border-radius:2px}
   .qpr-fill{height:100%;border-radius:2px;background:var(--gold)}
-  .qpr-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:20px}
+  .qpr-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin-top:20px}
   .qpr-table{width:100%;border-collapse:collapse;font-size:13px}
   .qpr-table th{padding:9px 12px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);background:var(--surface2);text-align:left;font-weight:normal;border-bottom:1px solid var(--border)}
   .qpr-table td{padding:8px 12px;border-bottom:1px solid rgba(58,37,53,.4)}
@@ -176,7 +176,7 @@
   ::-webkit-scrollbar-track{background:var(--bg)}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
   .scan-fab{display:none}
-  @media(max-width:768px){.stat-grid{grid-template-columns:repeat(3,1fr)}.charts-grid{grid-template-columns:1fr}.nav-brand{display:none}.nav .edit-btn.scan-nav{display:none}.drawer{width:100%}.form-grid{grid-template-columns:1fr}.scan-fab{display:flex;position:fixed;bottom:24px;right:24px;z-index:200;width:56px;height:56px;border-radius:50%;background:var(--gold);color:var(--bg);font-size:24px;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.4);text-decoration:none;border:none;cursor:pointer}}
+  @media(max-width:768px){.stat-grid{grid-template-columns:repeat(3,1fr)}.charts-grid{grid-template-columns:1fr}.nav-brand{display:none}nav .edit-btn{display:none}nav .theme-toggle{display:none}.drawer{width:100%}.form-grid{grid-template-columns:1fr}.scan-fab{display:flex;position:fixed;bottom:24px;right:24px;z-index:200;width:56px;height:56px;border-radius:50%;background:var(--gold);color:var(--bg);font-size:24px;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.4);text-decoration:none;border:none;cursor:pointer}}
   .scan-btn-full{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--gold);color:var(--gold);border-radius:6px;cursor:pointer;font-family:Georgia,serif;font-size:13px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s,opacity .2s;margin-bottom:6px}
   .scan-btn-full:hover{background:rgba(201,168,76,.08)}
   .scan-btn-full:disabled{border-color:var(--border);color:var(--muted);cursor:not-allowed;opacity:.5}
@@ -208,3 +208,39 @@
   .rate-note:focus{border-color:var(--gold)}
   .rate-note::placeholder{color:var(--muted)}
   .rate-actions{display:flex;gap:8px;justify-content:flex-end}
+
+  /* ── MOBILE (≤600px) ── */
+  @media (max-width: 600px) {
+    /* 1. Nav tabs — scrollable row */
+    .nav-tabs {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tab {
+      white-space: nowrap;
+      padding: 0 14px;
+      font-size: 11px;
+    }
+
+    /* 2. Stat grid — 2 columns */
+    .stat-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* 3. Charts grid — stacked */
+    .charts-grid {
+      grid-template-columns: 1fr;
+    }
+
+    /* 4. Edit drawer — full width */
+    .drawer {
+      width: 100%;
+    }
+
+    /* 5. Drawer form grid — single column */
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+  }
