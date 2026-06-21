@@ -39,7 +39,8 @@ function buildCharts() {
   // Country
   const cc = {}; WINES.forEach(w => cc[w.country] = (cc[w.country]||0)+w.qty);
   const cs = Object.entries(cc).sort((a,b)=>b[1]-a[1]);
-  _charts.cc = new Chart(document.getElementById('countryChart'), { type:'bar', data:{ labels:cs.map(e=>e[0]), datasets:[{ data:cs.map(e=>e[1]), backgroundColor:['#7c2d3f','#c9a84c','#9b5a6a','#5a7c9b','#7c9b5a','#9b7c5a','#6a5a9b'], borderWidth:0 }] }, options:{ ...def, plugins:{ legend:{display:false} } } });
+  const ccols = ['#7c2d3f','#c9a84c','#9b5a6a','#5a7c9b','#7c9b5a','#9b7c5a','#6a5a9b','#b06a4a','#4a8c7c','#8c4a6a','#5a9b6a','#9b9b4a'];
+  _charts.cc = new Chart(document.getElementById('countryChart'), { type:'bar', data:{ labels:cs.map(e=>e[0]), datasets:[{ data:cs.map(e=>e[1]), backgroundColor:cs.map((e,i)=>ccols[i % ccols.length]), borderWidth:0 }] }, options:{ ...def, plugins:{ legend:{display:false} } } });
 
   // Style donut
   const sc = {}; WINES.forEach(w => sc[w.style]=(sc[w.style]||0)+w.qty);
@@ -49,14 +50,16 @@ function buildCharts() {
   // Varietal
   const vm = {};
   const vn = v => {
-    if (v.includes('Pinot Noir')) return 'Pinot Noir';
+    if (v.includes('Pinot Noir')||v.includes('Spätburgunder')) return 'Pinot Noir';
     if (v.includes('Chardonnay')) return 'Chardonnay';
     if (v.includes('Cabernet Sauvignon')) return 'Cabernet Sauvignon';
+    if (v.includes('Riesling')) return 'Riesling';
     if (v.includes('Chenin Blanc')) return 'Chenin Blanc';
     if (v.includes('Gamay')) return 'Gamay';
     if (v.includes('Shiraz')||v.includes('Syrah')||v.includes('Mourvèdre')) return 'Shiraz / Mourvèdre';
     if (v.includes('Sangiovese')) return 'Sangiovese';
     if (v.includes('Nebbiolo')) return 'Nebbiolo';
+    if (v.includes('Nerello')) return 'Nerello Mascalese';
     if (v.includes('Zinfandel')) return 'Zinfandel';
     if (v.includes('Merlot')||v.includes('Cab Franc')||v.includes('Cabernet Franc')) return 'Bordeaux Blend';
     if (v.includes('Sauvignon Blanc')||v.includes('Sémillon')) return 'Sauvignon Blanc';

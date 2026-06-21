@@ -57,12 +57,12 @@
 {%- if consumed_count > 0 %}
   <div class="narrative" style="margin-top:20px">
     <h2>Drinking Notes</h2>
-    <p>{{ consumed_count }} bottle{{ '' if consumed_count == 1 else 's' }} consumed so far{% if rated_count > 0 %}, {{ rated_count }} rated: {{ rating_dist_str }}.{% else %}.{% endif %}</p>
-{%- if consumed_styles_str %}
-    <p style="margin-top:8px">Styles explored: {{ consumed_styles_str }}.</p>
+    <p>{{ consumed_count }} bottle{{ '' if consumed_count == 1 else 's' }} logged so far &mdash; {{ depleted_stats.count }} depleted from the cellar and {{ tasted_stats.count }} tasted ad-hoc (wines never part of the collection). The two tell different stories: the cellar log tracks what the collection is yielding, while the tastings map a wider exploration beyond it.</p>
+{%- if depleted_stats.count > 0 %}
+    <p style="margin-top:10px"><strong>From the cellar</strong> &mdash; {{ depleted_stats.count }} bottle{{ '' if depleted_stats.count == 1 else 's' }}{% if depleted_stats.rated > 0 %}, {{ depleted_stats.rated }} rated: {{ depleted_stats.rating_str }}{% endif %}.{% if depleted_stats.styles_str %} Styles: {{ depleted_stats.styles_str }}.{% endif %}{% if depleted_stats.top %} Highest-rated: {{ depleted_stats.top.producer }} {{ depleted_stats.top.wine }} {{ depleted_stats.top.vintage }} ({{ depleted_stats.top.myRating }}).{% endif %}</p>
 {%- endif %}
-{%- if top_rated %}
-    <p style="margin-top:8px">Highest-rated consumption: {{ top_rated.producer }} &mdash; {{ top_rated.wine }} {{ top_rated.vintage }} ({{ top_rated.myRating }}).</p>
+{%- if tasted_stats.count > 0 %}
+    <p style="margin-top:10px"><strong>Tasted (ad-hoc)</strong> &mdash; {{ tasted_stats.count }} wine{{ '' if tasted_stats.count == 1 else 's' }}{% if tasted_stats.rated > 0 %}, {{ tasted_stats.rated }} rated: {{ tasted_stats.rating_str }}{% endif %}.{% if tasted_stats.styles_str %} Styles: {{ tasted_stats.styles_str }}.{% endif %}{% if tasted_stats.top %} Highest-rated: {{ tasted_stats.top.producer }} {{ tasted_stats.top.wine }} {{ tasted_stats.top.vintage }} ({{ tasted_stats.top.myRating }}).{% endif %}</p>
 {%- endif %}
   </div>
 {%- endif %}

@@ -373,15 +373,23 @@ red_count = style_counts.get('red', 0)
 sparkling_count = style_counts.get('sparkling', 0)
 white_count = style_counts.get('white', 0)
 
-late_wines = [w for w in wines if w.get('drinkTo') and w['drinkTo'] < CY]
-late_count = len(late_wines)
-late_wine_examples = ', '.join(
-    w['producer'] + ' ' + str(w['vintage']) for w in late_wines
-) if late_wines else 'none identified'
+urgent_wines = [w for w in wines if w.get('drinkTo') and w['drinkTo'] <= CY]
+urgent_count = len(urgent_wines)
+urgent_examples = ', '.join(
+    w['producer'] + ' ' + str(w['vintage']) for w in urgent_wines
+) if urgent_wines else 'none'
+if urgent_count == 0:
+    urgent_note = 'No bottles are at or past the end of their drinking window.'
+elif urgent_count == 1:
+    urgent_note = ('One bottle is at the end of its drinking window this year ('
+                   + urgent_examples + ') and should be opened soon.')
+else:
+    urgent_note = (str(urgent_count) + ' bottles are at the end of their drinking window this year ('
+                   + urgent_examples + ') and should be opened soon.')
 
 int_vintage_wines = [w for w in wines if isinstance(w['vintage'], int)]
 oldest = min(int_vintage_wines, key=lambda w: w['vintage']) if int_vintage_wines else None
-oldest_label = (oldest['wine'] + ' ' + str(oldest['vintage'])) if oldest else 'the oldest bottle'
+oldest_label = (oldest['producer'] + ' ' + oldest['wine'] + ' ' + str(oldest['vintage'])) if oldest else 'the oldest bottle'
 
 pre2010 = sorted(
     [w for w in wines if isinstance(w['vintage'], int) and w['vintage'] < 2010],
@@ -438,81 +446,117 @@ for s in ['red', 'white', 'sparkling', 'rosé', 'dessert', 'orange']:
         consumed_style_parts.append(str(n) + ' ' + s)
 consumed_styles_str = ', '.join(consumed_style_parts) if consumed_style_parts else ''
 
+# ── consumed split: bottles depleted from the cellar vs ad-hoc tastings ───────
+def _group_stats(entries):
+    rated = [c for c in entries if c.get('myRating')]
+    dist = {}
+    for c in rated:
+        dist[c['myRating']] = dist.get(c['myRating'], 0) + 1
+    parts = []
+    for level in _sat_order:
+        if dist.get(level, 0) > 0:
+            parts.append(str(dist[level]) + ' ' + level)
+    rating_str = ', '.join(parts) if parts else 'none rated yet'
+    styles = {}
+    for c in entries:
+        styles[c['style']] = styles.get(c['style'], 0) + 1
+    style_parts = []
+    for s in ['red', 'white', 'sparkling', 'rosé', 'dessert', 'orange']:
+        if styles.get(s, 0) > 0:
+            style_parts.append(str(styles[s]) + ' ' + s)
+    styles_str = ', '.join(style_parts)
+    top = max(rated, key=lambda c: _sat_order.index(c['myRating'])) if rated else None
+    return {
+        'count': len(entries),
+        'rated': len(rated),
+        'rating_str': rating_str,
+        'styles_str': styles_str,
+        'top': top,
+    }
+
+depleted_stats = _group_stats([c for c in consumed if not c.get('adhoc')])
+tasted_stats = _group_stats([c for c in consumed if c.get('adhoc')])
+
 # ── curated narrative (update when collection changes significantly) ───────────
 OVERVIEW_PARAS = [
-    ('This is a {bottles}-bottle collection of genuine range and ambition &mdash; a highly curious taster\'s '
-     'working library spanning nine countries and five decades of vintages. The French backbone is broad: '
-     'Burgundy from village-level Marsannay (Domaine Collotte) and Hautes-C&ocirc;tes de Nuits (JJ Archambaud) '
-     'through Premier Cru Nuits-Saint-Georges (Albert Bichot, Esprit de Leflaive) and the storied Premier Cru '
-     'Gevrey-Chambertin Clos Saint-Jacques (Louis Jadot), '
-     'Bordeaux (Kirkland Pauillac and Saint-&Eacute;milion, plus a 1988 Rieussec Sauternes), '
-     'Alsace (Trimbach Cuvée Fr&eacute;d&eacute;ric Emile in magnum), Loire (Saumur Blanc from Clotilde Legrand), '
-     'Jura (Domaine Labet), a deepened Beaujolais shelf (Domaine de la Madone and Pierre-Marie Chermette Brouilly), '
-     'Bandol and Provence (Domaine Tempier, Clos Cibonne, Bi&eacute;ler P&egrave;re &amp; Fils), '
-     'Ch&acirc;teauneuf-du-Pape (Berthet-Rayne), and Champagne (Laherte Fr&egrave;res, Tarlant, Caz&eacute;-Thibaut). '
-     'Italy contributes four bottles: Cesari Amarone, Michele Chiarlo Tortoniano (Barolo), Lamole di Lamole '
-     'Chianti Classico, and Campo al Mare. '
-     'The American contingent is equally serious: a deep Littorai program spanning Pinot Noir, Chardonnay, '
-     'Chenin Blanc, and Vin Gris; weighty Napa Cabernet (Heitz Martha\'s, Heitz Trailside, Nickel &amp; Nickel, '
-     'Ashes &amp; Diamonds Cab Franc); Ultramarine and Domaine Carneros on the sparkling side; '
-     'Hirsch Vineyards on the Sonoma Coast; and Pacific Northwest coverage via Amity, '
-     'Ch&acirc;teau La Caille (Columbia Valley), and Hiyu Wine Farm. '
-     'Black Ankle Vineyards adds a Maryland Syrah as a regional outlier.'
-    ).format(bottles=total_bottles),
+    ('This is a {bottles}-bottle collection of real range and ambition &mdash; a highly curious taster\'s '
+     'working library spanning {countries} countries and vintages from {vmin} to {vmax}. The French backbone is '
+     'the broadest thread: Burgundy from village Marsannay and Fixin (Domaine Collotte) and '
+     'Hautes-C&ocirc;tes de Nuits (JJ Archambaud) up through Premier Cru Nuits-Saint-Georges '
+     '(Albert Bichot Ch&acirc;teau Gris Monopole, Esprit de Leflaive) and the storied Gevrey-Chambertin '
+     'Clos Saint-Jacques 1er Cru (Louis Jadot); Bordeaux (Kirkland Pauillac and Saint-&Eacute;milion, plus a '
+     '1988 Rieussec Sauternes); Alsace (Trimbach Cuv&eacute;e Fr&eacute;d&eacute;ric &Eacute;mile in magnum); '
+     'the Loire (Clotilde Legrand Saumur Blanc and Thibaud Boudignon ros&eacute;); the Jura (Domaine Labet); '
+     'a deep Beaujolais shelf (Domaine de la Madone and Pierre-Marie Chermette Brouilly); Bandol (Domaine Tempier); '
+     'the Rh&ocirc;ne (Pasquiers Sablet and Berthet-Rayne Ch&acirc;teauneuf-du-Pape); Champagne (Laherte Fr&egrave;res, '
+     'Tarlant, Caz&eacute;-Thibaut); and a Bugey Cerdon. '
+     'Italy now runs seven SKUs &mdash; Cesari Amarone, Michele Chiarlo Barolo, Lamole di Lamole Chianti Classico, '
+     'Campo al Mare Bolgheri, Cantina del Pino Barbera d\'Asti, and a Frank Cornelissen Etna pair (Munjebel and Susucaru). '
+     'Germany has deepened to four: Weingut Keller (Rheinhessen), two Mosel Rieslings (Vollenweider, Weiser-K&uuml;nstler), '
+     'and Wasenhaus Sp&auml;tburgunder (Baden). '
+     'The American contingent is the largest single block: a deep Littorai program (Pinot Noir, Chardonnay, '
+     'Chenin Blanc, and Vin Gris across the Sonoma Coast, Russian River, and Alexander Valley); serious Napa Cabernet '
+     '(Heitz Martha\'s and Trailside, Nickel &amp; Nickel, Ashes &amp; Diamonds Cab Franc, Stags\' Leap 125th, '
+     'Rutherford Ranch); V&eacute;rit&eacute; Le Diamant on the white side; California sparkling from Domaine Carneros, '
+     'Ultramarine, Cruse, and Hammerling; Hartford old-vine Zinfandel; Enfield and Calstar from the broader California field; '
+     'and Pacific Northwest coverage via Amity (Oregon), Ch&acirc;teau La Caille and Hiyu Wine Farm (Washington). '
+     'Maryland appears twice &mdash; Black Ankle Syrah and a Sister Farms ros&eacute; &mdash; as a regional outlier. '
+     'The rest of the world fills in around the edges: Don Melchor (Chile), Torbreck RunRig (Australia), '
+     'Finca Adalgisa and Malma/Chacra (Argentina), Kirkland Rioja and Bodega Can Feliu (Spain), '
+     'Tokaj Oremus (Hungary), and an Arnsdorfer ros&eacute; (Austria).'
+    ).format(bottles=total_bottles, countries=country_count,
+             vmin=(min(vintages) if vintages else ''), vmax=(max(vintages) if vintages else '')),
 
-    ('A standout thread is the RNDC Wine Library &mdash; bottles acquired at ~$18/btl that include '
-     'genuinely trophy-level wine: Torbreck RunRig (97 pts, $244 market), Don Melchor (96 pts, $150 '
-     'market), and Stags\' Leap 125th Anniversary Cabernet (95 pts, $58 market). These, alongside '
-     'direct acquisitions such as Heitz Martha\'s Vineyard (97 pts, $318 market, paid $223) and '
-     'Heitz Trailside (93 pts, paid $63), make the collection\'s market value considerably exceed '
-     'its acquisition cost. '
-     'V&eacute;rit&eacute; Le Diamant 2024 ($175/btl market) '
-     'anchors the white wine side alongside the Littorai Chardonnays, Weingut Keller Alte Reben Reserve (Pinot Blanc/Chardonnay), '
-     'and the Trimbach magnum. A Hungarian outlier &mdash; Tokaj Oremus Asz&uacute; 5 Puttonyos 2018 &mdash; '
-     'adds dessert depth beyond the Sauternes.'),
+    ('A standout thread is the RNDC Wine Library &mdash; bottles acquired at ~$18 that include genuinely '
+     'trophy-level wine: Torbreck RunRig (97 pts, $225 market), Don Melchor (96 pts, $150 market), and the '
+     'Stags\' Leap 125th Anniversary Cabernet (95 pts, $59 market). Alongside direct buys like Heitz Martha\'s '
+     'Vineyard (97 pts, $322 market, paid $223) and Heitz Trailside (93 pts, paid $63), the collection\'s market '
+     'value sits well above its acquisition cost. '
+     'Whites have become a real strength rather than an afterthought: V&eacute;rit&eacute; Le Diamant ($175/btl) and the '
+     'Littorai Chardonnays anchor the top end, with Weingut Keller\'s Alte Reben Reserve, the Trimbach Fr&eacute;d&eacute;ric '
+     '&Eacute;mile magnum, Domaine Labet\'s old-vine Jura Chardonnay, and two Mosel Rieslings adding range. On the sweet '
+     'side, Tokaj Oremus Asz&uacute; 5 Puttonyos joins the 1988 Rieussec for genuine dessert depth.'),
 
-    ('The collection skews heavily red ({reds} of {skus} SKUs) with solid sparkling depth ({sparkling} '
-     'bottles across Champagne, Domaine Carneros, Cruse, Ultramarine, Hammerling, and Bugey Cerdon) '
-     'and growing ros&eacute; coverage ({rose} bottles including Domaine Tempier, Clos Cibonne, Littorai Vin Gris, '
-     'and Ultramarine Heintz). White coverage has strengthened but remains the thinnest category. '
-     'Age balance deserves attention: {late} bottle{late_s} {late_are} past {late_their} drinking window '
-     '({late_examples}). The oldest bottle &mdash; {oldest} &mdash; warrants priority.'
+    ('The collection still skews red ({reds} of {bottles} bottles) but carries solid sparkling depth ({sparkling} '
+     'bottles across Champagne, Domaine Carneros, Cruse, Ultramarine, and Hammerling) and a genuine ros&eacute; shelf '
+     '({rose} bottles &mdash; Domaine Tempier, Littorai Vin Gris, Thibaud Boudignon, Enfield Foot Tread, '
+     'Bodega Can Feliu, Sister Farms, and Arnsdorfer). White coverage ({white} bottles) is no longer the weak spot '
+     'it once was. On age, most bottles are 2018 or newer, but a handful of older anchors have arrived '
+     '(Jadot Gevrey 2016, Trimbach 2012, Calstar 2015, Tarlant 2004, Rieussec 1988); the oldest bottle is {oldest}. '
+     '{urgent_note}'
     ).format(
-        reds=red_count, skus=sku_count, sparkling=sparkling_count,
-        rose=style_counts.get('rosé', 0),
-        late=late_count, late_s=('' if late_count == 1 else 's'),
-        late_are=('is' if late_count == 1 else 'are'),
-        late_their=('its' if late_count == 1 else 'their'),
-        late_examples=late_wine_examples,
-        oldest=oldest_label,
+        reds=red_count, bottles=total_bottles, sparkling=sparkling_count,
+        rose=style_counts.get('rosé', 0), white=white_count,
+        oldest=oldest_label, urgent_note=urgent_note,
     ),
 ]
 
 GAP_ITEMS = [
-    ('Whites still the thinnest category',
-     'Now ' + str(white_count) + ' white SKUs &mdash; up from earlier, with Littorai Chardonnays, '
-     'Haven Chenin Blanc, Keller Alte Reben Reserve, Domaine Labet, and V&eacute;rit&eacute; '
-     'Le Diamant filling gaps. But white Burgundy (Meursault, Puligny-Montrachet) and Loire '
-     '(Vouvray, Saveni&egrave;res) remain unrepresented.'),
+    ('Whites improved, but Burgundy and the dry Loire still thin',
+     'Now ' + str(white_count) + ' white bottles, with real German Riesling depth (two Mosel growers plus '
+     'Keller in Rheinhessen), the Trimbach Fr&eacute;d&eacute;ric &Eacute;mile magnum, the Littorai '
+     'Chardonnays, Haven Chenin Blanc, Domaine Labet, and V&eacute;rit&eacute; Le Diamant. Still '
+     'unrepresented: white Burgundy (Meursault, Puligny-Montrachet) and the dry Loire '
+     '(Vouvray, Saveni&egrave;res).'),
     ('Northern Rh&ocirc;ne absent',
-     'Hermitage, Cornas, Crozes-Hermitage, and Condrieu are missing &mdash; a meaningful gap for a '
-     'collection this geographically ambitious. The Southern Rh&ocirc;ne has Ch&acirc;teauneuf '
-     '(Berthet-Rayne) and Pasquiers Prebayon, but the North remains a blank.'),
-    ('Spain a token presence',
-     'One Catalan ros&eacute; (Bodega Can Feliu) is now in the collection, but Rioja, Ribera del Duero, '
-     'Priorat, and Bierzo remain absent &mdash; regions that complement the existing '
-     'Menc&iacute;a and Grenache threads and typically offer strong QPR.'),
-    ('Very limited aged inventory',
-     'Pre-2010 bottles: ' + pre2010_names + '. Nearly all other wines are 2018 or newer. '
-     'Mid-tier aged reds (2010&ndash;2015 Burgundy, Bordeaux, Barolo, or Rioja) for near-term '
-     'drinking are largely absent.'),
-    ('Pacific Northwest expanding but still selective',
-     'Oregon has Amity; Washington has Ch&acirc;teau La Caille (Columbia Valley) and '
-     'Hiyu Wine Farm. But Willamette Valley heavyweights (Domaine Drouhin, Eyrie, Ponzi, Cristom) '
-     'remain absent, as does any Columbia Valley Syrah.'),
-    ('Almost exclusively single-bottle positions',
-     'Nearly all SKUs are one bottle. Very limited ability to track evolution or serve multiples &mdash; '
-     'multi-bottle positions: ' + multi_btl_str + '.'),
+     'Hermitage, Cornas, C&ocirc;te-R&ocirc;tie, and Condrieu are all missing. The Southern Rh&ocirc;ne is '
+     'covered (Berthet-Rayne Ch&acirc;teauneuf-du-Pape, Pasquiers Sablet), but the granite hills of the '
+     'north remain a blank &mdash; a meaningful gap for a collection this geographically ambitious.'),
+    ('Spain still light',
+     'Two Spanish wines now &mdash; Kirkland Rioja Reserva and a Bodega Can Feliu Mallorca ros&eacute; &mdash; '
+     'but Ribera del Duero, Priorat, and Bierzo remain absent, regions that would complement the existing '
+     'Tempranillo, Menc&iacute;a, and Grenache threads and tend to offer strong QPR.'),
+    ('Aged inventory improving but still limited',
+     'Older anchors have arrived &mdash; Jadot Gevrey 2016, Trimbach 2012, Calstar 2015, plus the Tarlant 2004 '
+     'and Rieussec 1988 (pre-2010: ' + pre2010_names + '). Still, most of the cellar is 2018 or newer, and '
+     'ready-to-drink mid-tier reds from 2010&ndash;2016 (Burgundy, Bordeaux, Barolo, Rioja) remain scarce.'),
+    ('Pacific Northwest selective',
+     'Oregon has Amity; Washington has Ch&acirc;teau La Caille (Columbia Valley) and Hiyu Wine Farm. '
+     'Willamette Valley benchmarks (Domaine Drouhin, Eyrie, Cristom, Ponzi) and Walla Walla / Columbia Valley '
+     'Syrah are still absent.'),
+    ('Almost all single-bottle positions',
+     'Nearly every SKU is one bottle, which limits tracking a wine&rsquo;s evolution or serving multiples. '
+     'Multi-bottle positions: ' + multi_btl_str + '.'),
 ]
 
 # ── output path + versioning ──────────────────────────────────────────────────
@@ -575,6 +619,8 @@ _html = _template.render(
     rating_dist_str=rating_dist_str,
     consumed_styles_str=consumed_styles_str,
     top_rated=top_rated,
+    depleted_stats=depleted_stats,
+    tasted_stats=tasted_stats,
     # QPR methodology
     priced_count=priced_count,
     total_count=total_count,

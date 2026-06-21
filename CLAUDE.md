@@ -247,13 +247,12 @@ Derived fields (`qprRaw`, `qprIndex`, `purchasePriceEff`, `drinkStatus`) are com
 - Via JSON: move the wine object from `wines` to `consumed`, add `"removedDate": "YYYY-MM-DD"` and optionally `"myRating"` and `"myNote"`, set `qty` to 1, recompute QPR across remaining `wines`, regenerate HTML
 
 **Pull mobile tasting submissions:**
-```bash
-python3 generate_dashboard.py --pull-forms
-```
-Fetches pending submissions from Netlify Forms, converts them to ad-hoc consumed entries in `wines.json`, then regenerates and deploys. Deduplication uses Netlify submission IDs (stored in `netlify_forms_state.json`) as the primary guard, with a secondary field-match check (producer + wine + vintage + date) in case the state file is lost. Can be combined with `--sync`:
+
+Tasting notes submitted via the mobile form (`log.html`) accumulate in Netlify Forms at no cost. They are pulled into `wines.json` at sync time — do not run `--pull-forms` standalone, as every script run triggers a deploy (15 Netlify credits). Instead, always combine it with `--sync`:
 ```bash
 python3 generate_dashboard.py --sync exported.html --pull-forms
 ```
+Deduplication uses Netlify submission IDs (stored in `netlify_forms_state.json`) as the primary guard, with a secondary field-match check (producer + wine + vintage + date) in case the state file is lost.
 
 **Regenerate the dashboard** (the most common operation):
 ```bash
@@ -292,6 +291,6 @@ The curated collection narrative lives in `OVERVIEW_PARAS` and `GAP_ITEMS` near 
 
 **When Claude receives an HTML file from the user:**
 
-Run `python3 generate_dashboard.py --sync <path-to-html> --pull-forms` from this folder. The `--sync` flag handles extraction, diffing, ID collision checks, and JSON write; `--pull-forms` picks up any pending mobile tasting submissions. Review the printed diff summary and relay it to the user. If the diff shows zero changes, flag it — the user may have uploaded the wrong file.
+Run `python3 generate_dashboard.py --sync <path-to-html> --pull-forms` from this folder. Always include `--pull-forms` when syncing — it picks up any pending mobile tasting submissions in the same deploy (no extra credit cost). Do not run `--pull-forms` standalone; every script invocation triggers a Netlify deploy (15 credits). Review the printed diff summary and relay it to the user. If the diff shows zero changes, flag it — the user may have uploaded the wrong file.
 
 **ID assignment note:** `generate_dashboard.py` now derives new wine IDs from `Math.max` across both `WINES` and `CONSUMED` (patched 2026-05-11). Before this fix, new wines were assigned IDs based on `WINES` only, which could collide with IDs already used by consumed wines.
