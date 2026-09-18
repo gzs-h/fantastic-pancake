@@ -148,6 +148,30 @@
   }
   .key-row input:focus { border-color: var(--gold); }
 
+  /* ── MODE TOGGLE ── */
+  .mode-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .mode-toggle button {
+    flex: 1;
+    background: var(--surface);
+    border: none;
+    color: var(--muted);
+    padding: 12px;
+    min-height: 44px;
+    font-family: Georgia, serif;
+    font-size: 13px;
+    letter-spacing: .5px;
+    font-variant: small-caps;
+    cursor: pointer;
+  }
+  .mode-toggle button.active { background: var(--gold); color: #1a1a1a; }
+  .mode-hidden { display: none !important; }
+
   /* ── FIELD SECTIONS ── */
   .field-section {
     background: var(--surface);
@@ -281,7 +305,7 @@
 </header>
 
 <div class="draft-banner" id="draftBanner">
-  You have an unsaved tasting. Review and submit when you have signal.
+  You have an unsaved entry. Review and submit when you have signal.
 </div>
 
 <div class="form-wrap">
@@ -307,9 +331,16 @@
     </div>
   </div>
 
-  <!-- Tasting form -->
+  <!-- Mode toggle -->
+  <div class="mode-toggle">
+    <button type="button" id="modeTasting" class="active" onclick="setMode('tasting')">Log Tasting</button>
+    <button type="button" id="modeBottle" onclick="setMode('bottle')">Add Bottle</button>
+  </div>
+
+  <!-- Tasting / bottle form -->
   <form name="tasting-log" method="POST" data-netlify="true" id="tastingForm">
     <input type="hidden" name="form-name" value="tasting-log">
+    <input type="hidden" name="entryType" id="h-entryType" value="tasting">
 
     <!-- Hidden scan-populated fields -->
     <input type="hidden" name="varietal" id="h-varietal">
@@ -360,14 +391,22 @@
       </div>
     </div>
 
-    <!-- Tasting notes -->
+    <!-- Tasting notes / bottle details -->
     <div class="field-section">
-      <div class="section-label">Tasting Notes</div>
+      <div class="section-label" id="detailsLabel">Tasting Notes</div>
       <div class="form-group">
-        <label for="f-date">Date *</label>
+        <label for="f-date" id="dateLabel">Date *</label>
         <input type="date" id="f-date" name="date" required>
       </div>
-      <div class="form-group">
+      <div class="form-group bottle-only mode-hidden">
+        <label for="f-qty">Quantity *</label>
+        <input type="number" id="f-qty" name="qty" value="1" min="1" max="99" inputmode="numeric">
+      </div>
+      <div class="form-group bottle-only mode-hidden">
+        <label for="f-purchasePrice">Purchase Price (per bottle, USD)</label>
+        <input type="number" id="f-purchasePrice" name="purchasePrice" placeholder="optional" min="0" step="0.01" inputmode="decimal">
+      </div>
+      <div class="form-group tasting-only">
         <label for="f-rating">My Rating</label>
         <select id="f-rating" name="myRating">
           <option value="">&#8212; no rating &#8212;</option>
@@ -379,7 +418,7 @@
           <option value="outstanding">Outstanding</option>
         </select>
       </div>
-      <div class="form-group">
+      <div class="form-group tasting-only">
         <label for="f-note">Tasting Note</label>
         <textarea id="f-note" name="myNote" placeholder="Aromas, palate, finish&#8230;"></textarea>
       </div>
@@ -525,7 +564,7 @@ var DRAFT_KEY = 'tasting_draft';
 // All field IDs to save/restore (visible + hidden)
 var DRAFT_FIELDS = [
   'f-producer','f-wine','f-vintage','f-country','f-style',
-  'f-date','f-rating','f-note',
+  'f-date','f-rating','f-note','f-qty','f-purchasePrice','h-entryType',
   'h-varietal','h-appellation','h-region','h-score',
   'h-marketPrice','h-drinkFrom','h-drinkTo','h-pairings','h-summary'
 ];
@@ -551,11 +590,25 @@ function restoreDraft() {
     if (el) el.value = draft[id];
   });
   document.getElementById('draftBanner').classList.add('visible');
+  setMode(document.getElementById('h-entryType').value || 'tasting');
 }
 
 function clearDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch(e) {}
   document.getElementById('draftBanner').classList.remove('visible');
+}
+
+// ── MODE (tasting vs bottle) ─────────────────────────────────────────────────
+function setMode(mode) {
+  var bottle = (mode === 'bottle');
+  document.getElementById('h-entryType').value = mode;
+  document.getElementById('modeTasting').classList.toggle('active', !bottle);
+  document.getElementById('modeBottle').classList.toggle('active', bottle);
+  document.querySelectorAll('.bottle-only').forEach(function(el){ el.classList.toggle('mode-hidden', !bottle); });
+  document.querySelectorAll('.tasting-only').forEach(function(el){ el.classList.toggle('mode-hidden', bottle); });
+  document.getElementById('detailsLabel').textContent = bottle ? 'Bottle Details' : 'Tasting Notes';
+  document.getElementById('dateLabel').textContent = bottle ? 'Purchase Date *' : 'Date *';
+  document.getElementById('submitBtn').textContent = bottle ? 'Add Bottle' : 'Submit Tasting';
 }
 
 // ── FORM SUBMISSION ──────────────────────────────────────────────────────────
@@ -573,10 +626,12 @@ form.addEventListener('submit', function(e) {
   fetch('/', { method: 'POST', body: data })
     .then(function() {
       statusMsg.className = 'status-msg ok';
-      statusMsg.textContent = '✓ Tasting logged successfully!';
+      statusMsg.textContent = (document.getElementById('h-entryType').value === 'bottle') ? '✓ Bottle added successfully!' : '✓ Tasting logged successfully!';
+      var keepMode = document.getElementById('h-entryType').value;
       form.reset();
-      // Restore today's date after reset
+      // Restore today's date and the current mode after reset
       document.getElementById('f-date').value = _todayISO();
+      setMode(keepMode);
       clearDraft();
       submitBtn.disabled = false;
     })
