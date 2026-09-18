@@ -14,7 +14,7 @@ Technical rules (read before editing):
       WRONG:    p.append("+ '<td style=\"color:'+(x?'a':'b')+'>'+val+'</td>'\\n")
   - Write output with open(path, 'w', encoding='utf-8')
 
-Curated narrative text lives in OVERVIEW_PARAS and GAP_ITEMS below.
+Curated narrative text lives in OVERVIEW_PARAS and EXPLORATION_ITEMS below.
 Update those when the collection changes significantly.
 """
 
@@ -33,6 +33,15 @@ from zoneinfo import ZoneInfo
 _eastern = ZoneInfo('America/New_York')
 def _today():
     return datetime.now(_eastern).date()
+
+def _now_iso():
+    return datetime.now(_eastern).isoformat(timespec='seconds')
+
+def _sku_key(e):
+    """Normalized producer+wine+vintage key used to merge form-added bottles into an existing SKU."""
+    return ((e.get('producer') or '').strip().lower(),
+            (e.get('wine') or '').strip().lower(),
+            str(e.get('vintage', '')).strip().lower())
 
 # ── locate files ──────────────────────────────────────────────────────────────
 DIR = os.path.dirname(os.path.abspath(__file__))
@@ -56,6 +65,8 @@ def _sync_from_html(html_path):
 
     html_wines = json.loads(m_wines.group(1))
     html_consumed = json.loads(m_consumed.group(1))
+    m_build = re.search(r'const BUILD_TS = "([^"]*)";', html)
+    build_ts = m_build.group(1) if m_build else None
 
     # Load current wines.json for diffing
     if os.path.exists(JSON_PATH):
@@ -111,6 +122,31 @@ def _sync_from_html(html_path):
     if not (new_wine_ids or new_consumed_ids or removed_ids or qty_changes):
         print('  No changes detected.')
 
+    # Warn if this export predates the last form pull: form-added entries the export
+    # never saw would be dropped by the wholesale write below. Warning only — no retention.
+    _state_path = os.path.join(DIR, 'netlify_forms_state.json')
+    _last_pull, _merge_log = None, []
+    if os.path.exists(_state_path):
+        with open(_state_path, 'r', encoding='utf-8') as _sf:
+            _st = json.load(_sf)
+            _last_pull = _st.get('last_pull_at')
+            _merge_log = _st.get('merge_log', [])
+    if build_ts and _last_pull and _last_pull > build_ts:
+        _html_ids = html_wine_ids | html_consumed_ids
+        _at_risk = [e for e in json_wines + json_consumed
+                    if e.get('source') == 'form' and e['id'] not in _html_ids
+                    and (e.get('addedDate') or '') > build_ts]
+        _at_risk_merges = [m for m in _merge_log if m.get('at', '') > build_ts]
+        if _at_risk or _at_risk_merges:
+            print('  WARNING: this export (built ' + build_ts + ') predates the last form pull ('
+                  + _last_pull + '). Form changes it never saw will be reverted by this sync:')
+            for e in _at_risk:
+                print('    - dropped: id ' + str(e['id']) + ' ' + str(e.get('producer')) + ' ' + str(e.get('wine'))
+                      + ' (' + str(e.get('vintage')) + ')' + (' [consumed]' if 'removedDate' in e else ''))
+            for m in _at_risk_merges:
+                print('    - qty +' + str(m['qty_added']) + ' undone: id ' + str(m['id']) + ' ' + m['label'])
+            print('  Re-apply them after sync, or re-export from a freshly opened dashboard.')
+
     # ID collision check: IDs must be unique across both arrays
     all_ids = html_wine_ids | html_consumed_ids
     max_id = max(all_ids) if all_ids else 0
@@ -146,6 +182,10 @@ _parser.add_argument('--sync', metavar='HTML_FILE',
                      help='Sync wines.json from an exported dashboard HTML before generating.')
 _parser.add_argument('--pull-forms', action='store_true',
                      help='Pull pending Netlify Forms tasting submissions into wines.json.')
+_parser.add_argument('--no-deploy', action='store_true',
+                     help='Skip the Netlify deploy step (useful for data-quality review before publishing).')
+_parser.add_argument('--only-if-new', action='store_true',
+                     help='With --pull-forms: exit before regenerating/deploying if no new entries were pulled.')
 _args = _parser.parse_args()
 
 if _args.sync:
@@ -170,11 +210,12 @@ def _load_netlify_env():
 
 # ── pull Netlify Forms submissions (--pull-forms flag) ───────────────────────
 def _pull_netlify_forms():
-    """Fetch new Netlify Forms tasting submissions and append them to wines.json."""
+    """Fetch new Netlify Forms submissions (tastings and bottles) and merge them into wines.json.
+    Returns the number of entries added or merged (0 if nothing changed)."""
     site_id, token = _load_netlify_env()
     if not site_id or not token or token == 'YOUR_TOKEN_HERE':
         print('--pull-forms: netlify.env missing or token not set — skipping.')
-        return
+        return 0
 
     state_path = os.path.join(DIR, 'netlify_forms_state.json')
 
@@ -198,7 +239,7 @@ def _pull_netlify_forms():
         forms = _netlify_get('https://api.netlify.com/api/v1/sites/' + site_id + '/forms')
     except Exception as e:
         print('--pull-forms: could not list forms: ' + str(e))
-        return
+        return 0
     form_id = None
     for frm in forms:
         if frm.get('name') == 'tasting-log':
@@ -206,7 +247,7 @@ def _pull_netlify_forms():
             break
     if not form_id:
         print('--pull-forms: "tasting-log" form not found yet (deploy log.html first).')
-        return
+        return 0
 
     # Step 3 — Fetch submissions with pagination
     all_submissions = []
@@ -229,7 +270,7 @@ def _pull_netlify_forms():
     new_submissions = [s for s in all_submissions if s['id'] not in processed_ids]
     if not new_submissions:
         print('--pull-forms: 0 new submissions.')
-        return
+        return 0
 
     # Load current wines.json
     if os.path.exists(JSON_PATH):
@@ -270,13 +311,70 @@ def _pull_netlify_forms():
             str(c.get('removedDate', '')),
         ))
 
+    sku_index = {_sku_key(w): w for w in _wines2}
+    _cy = _today().year
+
     new_entries = []
+    new_bottles = []      # new SKUs added to wines
+    merged_bottles = []   # (existing entry, qty added)
     new_processed_ids = []
     for sub in new_submissions:
         data = sub.get('data', {})
         removed_date = data.get('date') or sub.get('created_at', '')[:10]
         vintage_raw = _parse_int_or_none(data.get('vintage'))
         vintage = vintage_raw if vintage_raw is not None else 'NV'
+
+        # ── Bottle addition (entryType == "bottle"); absent/other → tasting ──
+        if data.get('entryType') == 'bottle':
+            qty = _parse_int_or_none(data.get('qty')) or 1
+            purchase_price = _parse_float_or_none(data.get('purchasePrice'))
+            candidate = {'producer': data.get('producer', ''), 'wine': data.get('wine', ''), 'vintage': vintage}
+            existing = sku_index.get(_sku_key(candidate))
+            if existing is not None:
+                existing['qty'] = (existing.get('qty') or 0) + qty
+                if purchase_price is not None and existing.get('purchasePrice') is None:
+                    existing['purchasePrice'] = purchase_price
+                    existing['purchasePriceEff'] = purchase_price
+                elif purchase_price is not None and existing.get('purchasePrice') != purchase_price:
+                    print('  Note: ' + existing['producer'] + ' ' + existing['wine'] + ' submitted at $'
+                          + str(purchase_price) + ' — keeping existing purchase price $' + str(existing['purchasePrice']))
+                merged_bottles.append((existing, qty))
+            else:
+                market_price = _parse_float_or_none(data.get('marketPrice'))
+                pairings = _parse_json_or_none(data.get('pairings'))
+                has_scan = bool(pairings)
+                entry = {
+                    'id': next_id,
+                    'producer': data.get('producer', ''),
+                    'wine': data.get('wine', ''),
+                    'appellation': data.get('appellation', ''),
+                    'country': data.get('country', ''),
+                    'region': data.get('region', '') or data.get('country', ''),
+                    'vintage': vintage,
+                    'qty': qty,
+                    'varietal': data.get('varietal', ''),
+                    'style': data.get('style', 'red'),
+                    'purchasePrice': purchase_price,
+                    'marketPrice': market_price or purchase_price or 0,
+                    'score': _parse_int_or_none(data.get('score')) or 88,
+                    'drinkFrom': _parse_int_or_none(data.get('drinkFrom')) or _cy,
+                    'drinkTo': _parse_int_or_none(data.get('drinkTo')) or (_cy + 5),
+                    'pairings': pairings if has_scan else ['Pending enrichment'],
+                    'summary': data.get('summary') or 'Added via mobile form — pending enrichment.',
+                    'purchasePriceEff': purchase_price,
+                    'qprRaw': None,
+                    'qprIndex': None,
+                    'pending': True,
+                    'source': 'form',
+                    'addedDate': _now_iso(),
+                    'purchaseDate': removed_date,
+                }
+                _wines2.append(entry)
+                sku_index[_sku_key(entry)] = entry
+                new_bottles.append(entry)
+                next_id += 1
+            new_processed_ids.append(sub['id'])
+            continue
         dedup_key = (
             (data.get('producer') or '').lower(),
             (data.get('wine') or '').lower(),
@@ -312,31 +410,53 @@ def _pull_netlify_forms():
             'drinkTo': _parse_int_or_none(data.get('drinkTo')),
             'pairings': _parse_json_or_none(data.get('pairings')),
             'summary': data.get('summary', ''),
+            'source': 'form',
+            'addedDate': _now_iso(),
         }
         new_entries.append(entry)
         new_processed_ids.append(sub['id'])
         existing_keys.add(dedup_key)
         next_id += 1
 
-    if not new_entries:
+    changed = len(new_entries) + len(new_bottles) + len(merged_bottles)
+    if not changed:
         print('--pull-forms: all new submissions were duplicates — nothing added.')
     else:
         # Step 5 — Merge and write
         _consumed2.extend(new_entries)
         with open(JSON_PATH, 'w', encoding='utf-8') as _f:
             json.dump({'wines': _wines2, 'consumed': _consumed2}, _f, indent=2, ensure_ascii=False)
-        print('Pulled ' + str(len(new_entries)) + ' tasting submission(s) from Netlify Forms.')
-        for e in new_entries:
-            print('  → ' + e['producer'] + ' ' + e['wine'] + ' (' + str(e['removedDate']) + ')')
+        if new_entries:
+            print('Pulled ' + str(len(new_entries)) + ' tasting submission(s) from Netlify Forms.')
+            for e in new_entries:
+                print('  → ' + e['producer'] + ' ' + e['wine'] + ' (' + str(e['removedDate']) + ')')
+        if new_bottles:
+            print('Added ' + str(len(new_bottles)) + ' new bottle SKU(s) to the collection (pending enrichment).')
+            for e in new_bottles:
+                print('  + id ' + str(e['id']) + ': ' + e['producer'] + ' ' + e['wine'] + ' (' + str(e['vintage']) + ') ×' + str(e['qty']))
+        if merged_bottles:
+            print('Merged ' + str(len(merged_bottles)) + ' bottle submission(s) into existing SKUs.')
+            for e, q in merged_bottles:
+                print('  ↑ id ' + str(e['id']) + ': ' + e['producer'] + ' ' + e['wine'] + ' (' + str(e['vintage']) + ') +' + str(q) + ' → qty ' + str(e['qty']))
+        _state['last_pull_at'] = _now_iso()
+        _log = _state.get('merge_log', [])
+        for e, q in merged_bottles:
+            _log.append({'id': e['id'], 'qty_added': q, 'at': _state['last_pull_at'],
+                         'label': e['producer'] + ' ' + e['wine'] + ' (' + str(e['vintage']) + ')'})
+        _state['merge_log'] = _log[-50:]
 
     # Step 6 — Update state
     processed_ids.update(new_processed_ids)
     _state['processed_ids'] = sorted(processed_ids)
     with open(state_path, 'w', encoding='utf-8') as _f:
         json.dump(_state, _f, indent=2)
+    return changed
 
 if _args.pull_forms:
-    _pull_netlify_forms()
+    _pulled = _pull_netlify_forms()
+    if _args.only_if_new and not _pulled:
+        print('--only-if-new: nothing new — skipping regenerate/deploy.')
+        sys.exit(0)
 
 with open(JSON_PATH, 'r', encoding='utf-8') as f:
     _raw = json.load(f)
@@ -361,6 +481,13 @@ total_bottles = sum(w['qty'] for w in wines)
 sku_count = len(wines)
 countries = sorted(set(w['country'] for w in wines))
 country_count = len(countries)
+_country_counts = {}
+for w in wines:
+    _country_counts[w['country']] = _country_counts.get(w['country'], 0) + 1
+france_count = _country_counts.get('France', 0)
+usa_count = _country_counts.get('USA', 0)
+italy_count = _country_counts.get('Italy', 0)
+germany_count = _country_counts.get('Germany', 0)
 market_value = sum(w['marketPrice'] * w['qty'] for w in wines)
 mv_str = ('$' + str(round(market_value / 1000, 1)) + 'k') if market_value >= 1000 else ('$' + str(round(market_value)))
 vintages = [w['vintage'] for w in wines if isinstance(w['vintage'], int)]
@@ -372,6 +499,8 @@ for w in wines:
 red_count = style_counts.get('red', 0)
 sparkling_count = style_counts.get('sparkling', 0)
 white_count = style_counts.get('white', 0)
+rose_count = style_counts.get('rosé', 0)
+dessert_count = style_counts.get('dessert', 0)
 
 urgent_wines = [w for w in wines if w.get('drinkTo') and w['drinkTo'] <= CY]
 urgent_count = len(urgent_wines)
@@ -400,12 +529,19 @@ pre2010_names = ', '.join(w['producer'] + ' ' + str(w['vintage']) for w in pre20
 
 multi_btl = sorted([w for w in wines if w['qty'] > 1], key=lambda w: -w['qty'])
 multi_btl_str = ', '.join(
-    w['wine'].split('(')[0].strip() + ' (' + str(w['qty']) + ' btls)' for w in multi_btl
+    w['producer'] + ' ' + w['wine'].split('(')[0].strip() + ' (' + str(w['qty']) + ' btls)' for w in multi_btl
 ) if multi_btl else 'none'
 
 priced_wines = [w for w in wines if w.get('purchasePrice')]
 priced_count = len(priced_wines)
 total_count = len(wines)
+
+_scored = [w['score'] for w in wines if w.get('score')]
+avg_score = round(sum(_scored) / len(_scored), 1) if _scored else 0
+_priced_eff = [w['purchasePriceEff'] for w in wines if w.get('purchasePriceEff')]
+price_min = min(_priced_eff) if _priced_eff else 0
+price_max = max(_priced_eff) if _priced_eff else 0
+rndc_count = len([w for w in wines if w.get('purchasePriceEff') == 18])
 
 # ── consumed stats ────────────────────────────────────────────────────────────
 consumed_count = len(consumed)
@@ -477,86 +613,204 @@ def _group_stats(entries):
 depleted_stats = _group_stats([c for c in consumed if not c.get('adhoc')])
 tasted_stats = _group_stats([c for c in consumed if c.get('adhoc')])
 
+# ── Worth Restocking ──────────────────────────────────────────────────────────
+# Fully computed: a wine qualifies if (1) it is NOT in the current active
+# collection, (2) it HAS been consumed/tasted before (regular or ad-hoc), and
+# (3) it was rated 'very good' or 'outstanding' ('good' deliberately excluded —
+# the bar for the collection is higher than everyday drinking).
+# Matching normalizes producer+wine (lowercase, strip non-alphanumeric) so
+# punctuation variants ('Riesling "RR"' vs 'Riesling RR') don't break it.
+import re as _re
+
+def _norm_key(e):
+    s = str(e.get('producer', '')) + ' ' + str(e.get('wine', ''))
+    return _re.sub(r'[^a-z0-9]', '', s.lower())
+
+_active_keys = set(_norm_key(w) for w in wines)
+_HIGH = ('very good', 'outstanding')
+
+# Rolling window: only depletions from the last ~6 months qualify. Un-acted-on
+# candidates age out, keeping the list a *current* shopping aid.
+from datetime import timedelta as _td
+_restock_cutoff = (_today() - _td(days=183)).strftime('%Y-%m-%d')
+
+# (wine, vintage) pairs ever depleted from the cellar (any rating). Vintage-
+# aware on purpose: a full-bottle verdict only supersedes pours of the SAME
+# vintage (Keller RR: the 2025 bottle's 'good' doesn't silence the 2022 pour's
+# 'very good'). The active-collection exclusion stays vintage-blind so that
+# re-buying any vintage still counts as acting on a candidate.
+_depletion_keys = set((_norm_key(c), str(c.get('vintage')))
+                      for c in consumed if not c.get('adhoc'))
+
+_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+
+def _mk_item(c, times=1):
+    date = c.get('removedDate') or ''
+    if date:
+        _y, _m = date.split('-')[0], date.split('-')[1]
+        date_label = _months[int(_m) - 1] + ' ’' + _y[2:]
+    else:
+        date_label = '—'
+    return {
+        'producer': c.get('producer', ''),
+        'wine': c.get('wine', ''),
+        'vintage': c.get('vintage') if not isinstance(c.get('vintage'), str) else 'NV',
+        'rating': c.get('myRating', ''),
+        'date_label': date_label,
+        'times': times,
+        'context': ' · '.join(x for x in [
+            c.get('subRegion') or c.get('region') or None,
+            c.get('tier') or None,
+            c.get('varietal') or None,
+        ] if x),
+        'note': (c.get('myNote') or '').strip().replace('\n', '<br>'),
+    }
+
+
+# ── main list: depletion rows only, judged on their OWN rating ───────────────
+# A pour (adhoc row) never qualifies a wine for restocking, and never overrides
+# a lukewarm full-bottle verdict (e.g. Keller RR: pour 'very good', owned
+# bottle 'good' → not restock-worthy).
+_restock_by_key = {}
+for c in consumed:
+    if c.get('adhoc'):
+        continue
+    if c.get('myRating') not in _HIGH:
+        continue
+    if (c.get('removedDate') or '') < _restock_cutoff:
+        continue
+    k = _norm_key(c)
+    if k in _active_keys:
+        continue
+    slot = _restock_by_key.get(k)
+    if slot is None:
+        _restock_by_key[k] = {'entry': c, 'times': 1, 'date': c.get('removedDate') or ''}
+    else:
+        slot['times'] += 1
+        if (c.get('removedDate') or '') > slot['date']:
+            slot['entry'] = c
+            slot['date'] = c.get('removedDate') or ''
+
+restock_items = [_mk_item(s['entry'], s['times'])
+                 for s in sorted(_restock_by_key.values(),
+                                 key=lambda s: s['date'], reverse=True)]
+
+# ── secondary list: tasted (ad-hoc) very good+, never stocked ────────────────
+# Outstanding pours are shown inline and exempt from the window (rare,
+# high-signal); very-good pours collapse behind a toggle and age out with the
+# same 6-month window as the main list.
+_tasted_best = {}
+for c in consumed:
+    if not c.get('adhoc') or c.get('myRating') not in _HIGH:
+        continue
+    k = _norm_key(c)
+    if k in _active_keys or (k, str(c.get('vintage'))) in _depletion_keys:
+        continue
+    prev = _tasted_best.get(k)
+    if prev is None or (
+        (_sat_order.index(c['myRating']), c.get('removedDate') or '')
+        > (_sat_order.index(prev['myRating']), prev.get('removedDate') or '')
+    ):
+        _tasted_best[k] = c
+
+tasted_outstanding = []
+tasted_vg = []
+for c in sorted(_tasted_best.values(),
+                key=lambda c: c.get('removedDate') or '', reverse=True):
+    if c['myRating'] == 'outstanding':
+        tasted_outstanding.append(_mk_item(c))
+    elif (c.get('removedDate') or '') >= _restock_cutoff:
+        tasted_vg.append(_mk_item(c))
+
+# Palate-verified active SKUs: active wines whose producer+wine appears in the
+# drinking history in any form (used in the Overview value paragraph).
+_consumed_keys = set(_norm_key(c) for c in consumed)
+verified_count = len([w for w in wines if _norm_key(w) in _consumed_keys])
+
 # ── curated narrative (update when collection changes significantly) ───────────
+def _fmt_price(v):
+    """Render a price without a trailing .0 but with cents when they exist."""
+    return ('%d' % v) if float(v) == int(v) else ('%.2f' % v)
+
 OVERVIEW_PARAS = [
-    ('This is a {bottles}-bottle collection of real range and ambition &mdash; a highly curious taster\'s '
-     'working library spanning {countries} countries and vintages from {vmin} to {vmax}. The French backbone is '
-     'the broadest thread: Burgundy from village Marsannay and Fixin (Domaine Collotte) and '
-     'Hautes-C&ocirc;tes de Nuits (JJ Archambaud) up through Premier Cru Nuits-Saint-Georges '
-     '(Albert Bichot Ch&acirc;teau Gris Monopole, Esprit de Leflaive) and the storied Gevrey-Chambertin '
-     'Clos Saint-Jacques 1er Cru (Louis Jadot); Bordeaux (Kirkland Pauillac and Saint-&Eacute;milion, plus a '
-     '1988 Rieussec Sauternes); Alsace (Trimbach Cuv&eacute;e Fr&eacute;d&eacute;ric &Eacute;mile in magnum); '
-     'the Loire (Clotilde Legrand Saumur Blanc and Thibaud Boudignon ros&eacute;); the Jura (Domaine Labet); '
-     'a deep Beaujolais shelf (Domaine de la Madone and Pierre-Marie Chermette Brouilly); Bandol (Domaine Tempier); '
-     'the Rh&ocirc;ne (Pasquiers Sablet and Berthet-Rayne Ch&acirc;teauneuf-du-Pape); Champagne (Laherte Fr&egrave;res, '
-     'Tarlant, Caz&eacute;-Thibaut); and a Bugey Cerdon. '
-     'Italy now runs seven SKUs &mdash; Cesari Amarone, Michele Chiarlo Barolo, Lamole di Lamole Chianti Classico, '
-     'Campo al Mare Bolgheri, Cantina del Pino Barbera d\'Asti, and a Frank Cornelissen Etna pair (Munjebel and Susucaru). '
-     'Germany has deepened to four: Weingut Keller (Rheinhessen), two Mosel Rieslings (Vollenweider, Weiser-K&uuml;nstler), '
-     'and Wasenhaus Sp&auml;tburgunder (Baden). '
-     'The American contingent is the largest single block: a deep Littorai program (Pinot Noir, Chardonnay, '
-     'Chenin Blanc, and Vin Gris across the Sonoma Coast, Russian River, and Alexander Valley); serious Napa Cabernet '
-     '(Heitz Martha\'s and Trailside, Nickel &amp; Nickel, Ashes &amp; Diamonds Cab Franc, Stags\' Leap 125th, '
-     'Rutherford Ranch); V&eacute;rit&eacute; Le Diamant on the white side; California sparkling from Domaine Carneros, '
-     'Ultramarine, Cruse, and Hammerling; Hartford old-vine Zinfandel; Enfield and Calstar from the broader California field; '
-     'and Pacific Northwest coverage via Amity (Oregon), Ch&acirc;teau La Caille and Hiyu Wine Farm (Washington). '
-     'Maryland appears twice &mdash; Black Ankle Syrah and a Sister Farms ros&eacute; &mdash; as a regional outlier. '
-     'The rest of the world fills in around the edges: Don Melchor (Chile), Torbreck RunRig (Australia), '
-     'Finca Adalgisa and Malma/Chacra (Argentina), Kirkland Rioja and Bodega Can Feliu (Spain), '
-     'Tokaj Oremus (Hungary), and an Arnsdorfer ros&eacute; (Austria).'
-    ).format(bottles=total_bottles, countries=country_count,
-             vmin=(min(vintages) if vintages else ''), vmax=(max(vintages) if vintages else '')),
+    ('The collection sits at {sku} SKUs ({bottles} bottles) across {countries} countries, with vintages '
+     'spanning {vmin}&ndash;{vmax}. France ({france}) and the U.S. ({usa}) still form the backbone, but the '
+     'shape has changed: Burgundy is now the largest single region at 19 SKUs, and the September harvest trip '
+     'is written all over it &mdash; six Domaine Collotte bottlings anchored in Marsannay (Blanc, Ros&eacute;, '
+     'Le Boivin, Champs Salomon) sitting beneath a Premier Cru spine that runs Chablis Mont&eacute;e de '
+     'Tonnerre, Beaune Clos des Ursules, two Volnays, three Nuits-Saint-Georges and Gevrey-Chambertin Clos '
+     'Saint-Jacques. The American side remains Napa and Sonoma Cabernet and Pinot Noir (Heitz, Littorai, '
+     'V&eacute;rit&eacute;). Italy ({italy}) now stretches from Barolo to Etna; Germany ({germany}) is Keller '
+     'and the Mosel. The newest footholds are the furthest afield yet &mdash; Hambledon\'s Hampshire chalk '
+     'from England, and Env&iacute;nate\'s ungrafted List&aacute;n Blanco from Tenerife.'
+    ).format(sku=sku_count, bottles=total_bottles, countries=country_count,
+             vmin=(min(vintages) if vintages else ''), vmax=(max(vintages) if vintages else ''),
+             france=france_count, usa=usa_count, italy=italy_count, germany=germany_count),
 
-    ('A standout thread is the RNDC Wine Library &mdash; bottles acquired at ~$18 that include genuinely '
-     'trophy-level wine: Torbreck RunRig (97 pts, $225 market), Don Melchor (96 pts, $150 market), and the '
-     'Stags\' Leap 125th Anniversary Cabernet (95 pts, $59 market). Alongside direct buys like Heitz Martha\'s '
-     'Vineyard (97 pts, $322 market, paid $223) and Heitz Trailside (93 pts, paid $63), the collection\'s market '
-     'value sits well above its acquisition cost. '
-     'Whites have become a real strength rather than an afterthought: V&eacute;rit&eacute; Le Diamant ($175/btl) and the '
-     'Littorai Chardonnays anchor the top end, with Weingut Keller\'s Alte Reben Reserve, the Trimbach Fr&eacute;d&eacute;ric '
-     '&Eacute;mile magnum, Domaine Labet\'s old-vine Jura Chardonnay, and two Mosel Rieslings adding range. On the sweet '
-     'side, Tokaj Oremus Asz&uacute; 5 Puttonyos joins the 1988 Rieussec for genuine dessert depth.'),
+    ('Buying stays disciplined &mdash; {rndc} SKUs came from the RNDC Wine Library at $18 each, effective '
+     'per-bottle cost runs ${pmin}&ndash;${pmax}, and the average critic score is {avg_score}. The caveat is '
+     'unchanged, and the Burgundy build makes it sharper: only {verified} of {sku} active SKUs have a '
+     'palate-verified counterpart in the drinking history, and the Premier Cru spine &mdash; the most '
+     'expensive concentration in the cellar &mdash; is almost entirely unproven against this palate. What '
+     'evidence exists is encouraging but thin: Jadot\'s 2004 Chapelle-Chambertin and Leroux\'s '
+     'Savigny-l&egrave;s-Beaune both very good, Collotte\'s Cuv&eacute;e Vieilles Vignes merely good. Market '
+     'price and critic score stay proxies until the cork comes out.'
+    ).format(rndc=rndc_count, avg_score=avg_score,
+             pmin=_fmt_price(price_min), pmax=_fmt_price(price_max),
+             verified=verified_count, sku=sku_count),
 
-    ('The collection still skews red ({reds} of {bottles} bottles) but carries solid sparkling depth ({sparkling} '
-     'bottles across Champagne, Domaine Carneros, Cruse, Ultramarine, and Hammerling) and a genuine ros&eacute; shelf '
-     '({rose} bottles &mdash; Domaine Tempier, Littorai Vin Gris, Thibaud Boudignon, Enfield Foot Tread, '
-     'Bodega Can Feliu, Sister Farms, and Arnsdorfer). White coverage ({white} bottles) is no longer the weak spot '
-     'it once was. On age, most bottles are 2018 or newer, but a handful of older anchors have arrived '
-     '(Jadot Gevrey 2016, Trimbach 2012, Calstar 2015, Tarlant 2004, Rieussec 1988); the oldest bottle is {oldest}. '
-     '{urgent_note}'
+    ('Style-wise the cellar still skews red ({reds} of {bottles} bottles), but sparkling ({sparkling}) is '
+     'deeper than it looks &mdash; three Champagnes, three Domaine Carneros, an Ultramarine, a Bugey Cerdon '
+     'and now an English Classic Cuv&eacute;e &mdash; alongside ros&eacute; ({rose}), white ({white}) and a '
+     'small dessert corner. Most bottles are 2018 or newer; older anchors stay rare &mdash; a 1988 Rieussec, '
+     'a 2004 Tarlant, a 2006 d\'Yquem and 2012s from Trimbach and Tondonia (oldest: {oldest}). Single bottles '
+     'are still the rule, but multiples have doubled to six &mdash; {multi}. {urgent_note}'
     ).format(
         reds=red_count, bottles=total_bottles, sparkling=sparkling_count,
-        rose=style_counts.get('rosé', 0), white=white_count,
-        oldest=oldest_label, urgent_note=urgent_note,
+        rose=rose_count, white=white_count,
+        oldest=oldest_label, multi=multi_btl_str, urgent_note=urgent_note,
     ),
 ]
 
-GAP_ITEMS = [
-    ('Whites improved, but Burgundy and the dry Loire still thin',
-     'Now ' + str(white_count) + ' white bottles, with real German Riesling depth (two Mosel growers plus '
-     'Keller in Rheinhessen), the Trimbach Fr&eacute;d&eacute;ric &Eacute;mile magnum, the Littorai '
-     'Chardonnays, Haven Chenin Blanc, Domaine Labet, and V&eacute;rit&eacute; Le Diamant. Still '
-     'unrepresented: white Burgundy (Meursault, Puligny-Montrachet) and the dry Loire '
-     '(Vouvray, Saveni&egrave;res).'),
-    ('Northern Rh&ocirc;ne absent',
-     'Hermitage, Cornas, C&ocirc;te-R&ocirc;tie, and Condrieu are all missing. The Southern Rh&ocirc;ne is '
-     'covered (Berthet-Rayne Ch&acirc;teauneuf-du-Pape, Pasquiers Sablet), but the granite hills of the '
-     'north remain a blank &mdash; a meaningful gap for a collection this geographically ambitious.'),
-    ('Spain still light',
-     'Two Spanish wines now &mdash; Kirkland Rioja Reserva and a Bodega Can Feliu Mallorca ros&eacute; &mdash; '
-     'but Ribera del Duero, Priorat, and Bierzo remain absent, regions that would complement the existing '
-     'Tempranillo, Menc&iacute;a, and Grenache threads and tend to offer strong QPR.'),
-    ('Aged inventory improving but still limited',
-     'Older anchors have arrived &mdash; Jadot Gevrey 2016, Trimbach 2012, Calstar 2015, plus the Tarlant 2004 '
-     'and Rieussec 1988 (pre-2010: ' + pre2010_names + '). Still, most of the cellar is 2018 or newer, and '
-     'ready-to-drink mid-tier reds from 2010&ndash;2016 (Burgundy, Bordeaux, Barolo, Rioja) remain scarce.'),
-    ('Pacific Northwest selective',
-     'Oregon has Amity; Washington has Ch&acirc;teau La Caille (Columbia Valley) and Hiyu Wine Farm. '
-     'Willamette Valley benchmarks (Domaine Drouhin, Eyrie, Cristom, Ponzi) and Walla Walla / Columbia Valley '
-     'Syrah are still absent.'),
-    ('Almost all single-bottle positions',
-     'Nearly every SKU is one bottle, which limits tracking a wine&rsquo;s evolution or serving multiples. '
-     'Multi-bottle positions: ' + multi_btl_str + '.'),
+# -- For Further Exploration ---------------------------------------------------
+# Exploration status is measured by TASTING HISTORY (consumed, incl. ad-hoc
+# Log Tasting entries), not by what sits on the shelf - owning an unopened
+# bottle proves nothing about whether a region suits the palate. Each item is
+# (name, status, evidence) where status is 'untouched' (zero tastings anywhere)
+# or 'partial' (tasted, verdict unresolved). Hand-curated, but every evidence
+# claim below was verified against wines.json - re-verify before editing.
+# Last verified: 2026-09-18.
+EXPLORATION_ITEMS = [
+    ('Northern Rh&ocirc;ne', 'untouched',
+     'Hermitage, Cornas, C&ocirc;te-R&ocirc;tie, Condrieu &mdash; no footprint anywhere; the two Southern '
+     'Rh&ocirc;ne bottles (Sablet, Ch&acirc;teauneuf) don\'t answer for the north'),
+    ('Portugal', 'untouched',
+     'no Douro, D&atilde;o, Bairrada, or Vinho Verde has ever appeared in the collection or tasting log'),
+    ('Nebbiolo', 'untouched',
+     'one Barolo on the shelf (Chiarlo Tortoniano 2021), never opened; the entire Piedmont tasting record '
+     'is two Barberas'),
+    ('White Burgundy', 'untouched',
+     'the only Chassagne-Montrachet in the drinking history is Bichot\'s red &mdash; and a Chablis Premier '
+     'Cru, a Pernand-Vergelesses blanc and two Marsannay blancs now sit unopened; Meursault and Puligny '
+     'untasted'),
+    ('Spain beyond Rioja', 'untouched',
+     'Ribera del Duero, Priorat, Bierzo &mdash; zero tastings anywhere; Env&iacute;nate\'s Canary List&aacute;n '
+     'Blanco and a Mallorcan rosat are on the shelf, both untasted'),
+    ('Washington', 'untouched',
+     'two bottles on the shelf, zero ever tasted; Walla Walla Syrah has no footprint at all'),
+    ('Rioja', 'partial',
+     '3 tastings, all positive &mdash; 2&times; Kirkland Reserva (good) and Murrieta Castillo Ygay Blanco '
+     'Gran Reserva 1986 (outstanding, ad-hoc pour) &middot; the one bottle owned, Tondonia Reserva 2012, '
+     'is still untasted'),
+    ('Loire beyond Saumur', 'partial',
+     '4 tastings &mdash; Chidaine Montlouis &times;2 (Les Bournais good, Les Choisilles very good), Montcy '
+     'Cour-Cheverny unrated, Boudignon Ros&eacute; de Loire acceptable &middot; Saveni&egrave;res Roche aux '
+     'Moines now on hand, Vouvray untasted'),
+    ('Oregon', 'partial',
+     'six casual-tier tastings (best: Constant Crush Pinot Noir, very good) &middot; benchmarks '
+     'Drouhin, Eyrie, Cristom untasted'),
 ]
 
 # ── output path + versioning ──────────────────────────────────────────────────
@@ -597,8 +851,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 _env = Environment(
     loader=FileSystemLoader(DIR),
     autoescape=False,           # output is treated as raw HTML; values from
-                                # OVERVIEW_PARAS / GAP_ITEMS contain HTML
-                                # entities and tags that must pass through.
+                                # OVERVIEW_PARAS / EXPLORATION_ITEMS contain
+                                # HTML entities and tags that must pass through.
     keep_trailing_newline=True,
 )
 _template = _env.get_template('template.html.j2')
@@ -612,7 +866,10 @@ _html = _template.render(
     vintage_span=vintage_span,
     # narrative
     overview_paras=OVERVIEW_PARAS,
-    gap_items=GAP_ITEMS,
+    exploration_items=EXPLORATION_ITEMS,
+    restock_items=restock_items,
+    tasted_outstanding=tasted_outstanding,
+    tasted_vg=tasted_vg,
     # drinking notes (conditional block)
     consumed_count=consumed_count,
     rated_count=rated_count,
@@ -630,6 +887,7 @@ _html = _template.render(
     # data
     wines_json=wines_json,
     consumed_json=consumed_json,
+    build_ts=_now_iso(),
     cy=CY,
 )
 
@@ -689,4 +947,7 @@ def _deploy_to_netlify(html_path):
     except Exception as e:
         print('Netlify deploy error: ' + str(e))
 
-_deploy_to_netlify(out_path)
+if not _args.no_deploy:
+    _deploy_to_netlify(out_path)
+else:
+    print('Netlify: skipped (--no-deploy)')

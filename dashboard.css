@@ -1,14 +1,16 @@
   :root {
     --bg:#0f0a0e;--surface:#1a1118;--surface2:#231820;--border:#3a2535;
     --burgundy:#7c2d3f;--gold:#c9a84c;--gold-light:#e8c97a;--cream:#f0e6d3;
-    --text:#e8ddd0;--muted:#9b8a7a;
+    --text:#e8ddd0;--muted:#9b8a7a;--soft:#b3a28e;--rose:#d98a9c;
+    --chip-untouched-bg:rgba(124,45,63,.35);--chip-partial-bg:rgba(201,168,76,.15);
     --past:#6a4a4a;--urgent:#e07830;--drinknow:#4caf7a;--soon:#5090c8;--wait:#7a6a7a;
   }
   /* ── LIGHT MODE ── */
   [data-theme="light"] {
     --bg:#f5ede0;--surface:#ffffff;--surface2:#ede3d5;--border:#d4c4b0;
     --burgundy:#7c2d3f;--gold:#8b5a1a;--gold-light:#6b3d0a;--cream:#2c1606;
-    --text:#3a2010;--muted:#8a7060;
+    --text:#3a2010;--muted:#8a7060;--soft:#5f4936;--rose:#7c2d3f;
+    --chip-untouched-bg:rgba(124,45,63,.13);--chip-partial-bg:rgba(139,90,26,.16);
     --past:#c0392b;--urgent:#c95000;--drinknow:#1e7a42;--soon:#1a5c8a;--wait:#6a7a8a;
   }
   [data-theme="light"] body{background:var(--bg)}
@@ -121,6 +123,38 @@
   .narrative h2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
   .gap-item{background:var(--surface2);border-left:3px solid var(--gold);padding:8px 14px;margin-bottom:8px;border-radius:0 4px 4px 0;font-size:13px;color:var(--cream);line-height:1.55}
   .gap-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:2px}
+  .xp-legend{display:flex;gap:16px;font-size:11px;color:var(--soft);margin:4px 0 10px;align-items:center;flex-wrap:wrap}
+  .xp-rows{border-top:1px solid var(--border)}
+  .xp-row{display:flex;gap:12px;padding:9px 2px;border-bottom:1px solid var(--border);align-items:baseline;flex-wrap:wrap}
+  .xp-row:last-child{border-bottom:none}
+  .xp-name{color:var(--cream);font-size:13px;flex:0 0 150px}
+  .xp-chip{flex:0 0 80px;font-size:9px;letter-spacing:1px;text-transform:uppercase;border-radius:3px;padding:1px 6px;text-align:center}
+  .xp-chip.untouched{color:var(--rose);background:var(--chip-untouched-bg);padding:2px 8px}
+  .xp-chip.partial{color:var(--gold-light);background:var(--chip-partial-bg);padding:2px 8px}
+  .xp-ev{color:var(--soft);font-size:12px;line-height:1.5;flex:1;min-width:200px}
+  .restock-head{display:flex;gap:12px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 2px 4px}
+  .restock-row{display:flex;gap:12px;padding:8px 2px;border-top:1px solid var(--border);align-items:baseline;flex-wrap:wrap}
+  .restock-row.has-note{cursor:pointer}
+  .rk-main{flex:1;min-width:180px}
+  .rk-wine{color:var(--cream);font-size:13px;display:block}
+  .rk-sub{color:var(--muted);font-size:11px;display:block}
+  .rk-cat{flex:0 0 200px;color:var(--soft);font-size:12px;line-height:1.5}
+  .rk-date{flex:0 0 66px;color:var(--soft);font-size:12px;text-align:right}
+  .rk-badge{flex:0 0 78px;text-align:right}
+  .rk-note-ind{color:var(--muted);font-size:10px;letter-spacing:.5px}
+  .restock-badge{display:inline-block;background:rgba(201,168,76,.1);border:1px solid var(--gold);color:var(--gold);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:1px 5px;border-radius:2px}
+  .restock-note{display:none;font-size:12px;font-style:italic;color:var(--soft);margin-top:4px;line-height:1.5}
+  .restock-note.open{display:block}
+  .restock-badge.outstanding{background:var(--chip-untouched-bg);border-color:var(--burgundy);color:var(--rose)}
+  .tns-block{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
+  .tns-title{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .tns-toggle{font-size:11px;color:var(--muted);cursor:pointer;padding:5px 2px}
+  .tns-toggle:hover{color:var(--cream)}
+  .tns-list{display:none}
+  .tns-list.open{display:block}
+  .tns-row{padding:5px 2px;border-top:1px solid var(--border)}
+  .tns-row .rk-sub{display:inline;margin-left:6px}
+  .tier-chip{display:inline-block;background:rgba(201,168,76,.1);border:1px solid var(--gold);color:var(--gold);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:3px}
   .gantt-controls{display:flex;gap:16px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
   .gantt-legend{display:flex;gap:14px;flex-wrap:wrap}
   .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
@@ -200,6 +234,7 @@
   .rate-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
   .rate-wine-name{font-size:15px;color:var(--cream);margin-bottom:16px;line-height:1.35}
   .rate-section-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .rate-body{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.45}
   .rate-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
   .rate-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-family:Georgia,serif;transition:border-color .2s,color .2s,background .2s}
   .rate-btn:hover{border-color:var(--gold);color:var(--cream)}

@@ -132,13 +132,23 @@ function renderProfiles() {
     const qprDisplay = hasQpr
       ? '<div class="qpr-bar"><span>QPR</span><div class="qpr-track"><div class="qpr-fill" style="width:'+qp+'%"></div></div><span style="color:var(--gold)">'+w.qprIndex+'/10</span></div>'
       : '<div style="font-size:11px;color:var(--muted)">QPR &mdash; no purchase price recorded</div>';
+    let app = w.appellation || '';
+    if (w.tier) {
+      const tierRx = new RegExp(w.tier.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i');
+      app = app.replace(tierRx,'').replace(/\s{2,}/g,' ').replace(/\s*[·,–-]\s*$/,'').trim();
+    }
+    if (w.subRegion && app.toLowerCase().indexOf(w.subRegion.toLowerCase()) === -1) {
+      app = app ? app + ' · ' + w.subRegion : w.subRegion;
+    }
+    const tierChip = w.tier ? '<span class="tier-chip">'+w.tier+'</span>' : '';
     return '<div class="wine-card">'
       + '<div class="card-hdr"><div>'
       + '<div class="card-producer">'+w.producer+' · '+vd+'</div>'
       + '<div class="card-wine">'+w.wine+'</div>'
-      + '<div class="card-app">'+w.appellation+'</div>'
+      + '<div class="card-app">'+app+'</div>'
       + '</div><div><div class="card-score">'+w.score+'<span>pts</span></div></div></div>'
       + '<div class="card-meta">'
+      + tierChip
       + '<span class="meta-tag">'+(eStyle[w.style]||'')+' '+w.style+'</span>'
       + '<span class="meta-tag">'+w.country+'</span>'
       + '<span class="meta-tag">'+w.varietal.split(',')[0]+'</span>'
@@ -366,6 +376,46 @@ function _openRateModal(w, idx, fromDecrement) {
     cleanup();
   };
 }
+function _openDupModal(existing, producer, wine, vintage, qty, purchasePrice, msg) {
+  var vd = (typeof vintage === "string") ? "NV" : vintage;
+  var overlay = document.getElementById("dupOverlay");
+  var nameEl = document.getElementById("dupWineName");
+  var msgEl = document.getElementById("dupMsg");
+  var confirmBtn = document.getElementById("dupConfirmBtn");
+  var cancelBtn = document.getElementById("dupCancelBtn");
+  nameEl.textContent = producer + " \u2014 " + wine + " (" + vd + ")";
+  msgEl.textContent = existing.qty + " bottle" + (existing.qty === 1 ? "" : "s")
+    + " already on hand. Add " + qty + " to that SKU instead of creating a second entry?";
+  confirmBtn.textContent = "Add to Existing";
+  overlay.classList.add("open");
+  function cleanup() { overlay.classList.remove("open"); confirmBtn.onclick = null; cancelBtn.onclick = null; }
+  cancelBtn.onclick = function() {
+    cleanup();
+    msg.style.color = "#e0a050";
+    msg.textContent = "Not added \u2014 " + wine + " is already in the collection.";
+    setTimeout(function(){msg.textContent="";}, 4000);
+  };
+  confirmBtn.onclick = function() {
+    var prev = existing.qty;
+    existing.qty = prev + qty;
+    // Keep the original purchase price; only fill it if it was never recorded.
+    if ((existing.purchasePrice === null || existing.purchasePrice === undefined) && purchasePrice !== null) {
+      existing.purchasePrice = purchasePrice;
+      existing.purchasePriceEff = purchasePrice;
+    }
+    window._scanPending = null;
+    recomputeDerivedFields();
+    _logChange("\u25b2 Restocked: " + producer + " \u2014 " + wine + " (" + vd + "): qty "
+      + prev + " \u2192 " + existing.qty);
+    clearAddForm();
+    renderInvList();
+    refreshStats();
+    cleanup();
+    msg.style.color = "#4caf7a";
+    msg.textContent = "\u2713 Added " + qty + " to existing SKU \u2014 " + wine + " now \u00d7" + existing.qty + ".";
+    setTimeout(function(){msg.textContent="";}, 4000);
+  };
+}
 function addWine() {
   var producer = document.getElementById("f-producer").value.trim();
   var wine = document.getElementById("f-wine").value.trim();
@@ -389,6 +439,24 @@ function addWine() {
   var drinkFrom = parseInt(document.getElementById("f-from").value) || CY;
   var drinkTo = parseInt(document.getElementById("f-to").value) || (CY + 5);
   var purchasePriceEff = purchasePrice || null;
+  // Duplicate-SKU guard: a repeat purchase of a wine already in the collection
+  // raises qty on the existing SKU instead of creating a second one. Mirrors the
+  // normalized producer+wine+vintage key used by --pull-forms in generate_dashboard.py.
+  var _skuKey = function(p, w, v) {
+    return [String(p == null ? "" : p).trim().toLowerCase(),
+            String(w == null ? "" : w).trim().toLowerCase(),
+            String(v == null ? "" : v).trim().toLowerCase()].join("|");
+  };
+  var _newKey = _skuKey(producer, wine, vintage);
+  var existing = null;
+  for (var _i = 0; _i < WINES.length; _i++) {
+    if (_skuKey(WINES[_i].producer, WINES[_i].wine, WINES[_i].vintage) === _newKey) { existing = WINES[_i]; break; }
+  }
+  if (existing) {
+    _openDupModal(existing, producer, wine, vintage, qty, purchasePrice, msg);
+    return;
+  }
+
   var allIds = WINES.map(function(w){return w.id;}).concat(CONSUMED.map(function(w){return w.id;}));
   var newId = allIds.length ? Math.max.apply(null, allIds) + 1 : 1;
   WINES.push({

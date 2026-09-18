@@ -46,13 +46,65 @@
     <div class="chart-card"><div class="chart-title">Style Distribution</div><canvas id="styleChart"></canvas></div>
     <div class="chart-card full"><div class="chart-title">Varietal Breakdown</div><canvas id="varietalChart"></canvas></div>
   </div>
-  <div class="chart-card" style="margin-bottom:0">
-    <div class="chart-title">Collection Gaps &mdash; Neutral Assessment</div>
-    <div style="margin-top:4px">
-{%- for label, text in gap_items %}
-      <div class="gap-item"><span class="gap-label">{{ label }}</span>{{ text }}</div>
+  <div class="chart-card" style="margin-bottom:20px">
+    <div class="chart-title">For Further Exploration &mdash; By Tasting Evidence</div>
+    <div class="xp-legend">
+      <span><span class="xp-chip untouched">untouched</span> zero tastings</span>
+      <span><span class="xp-chip partial">partial</span> tasted, verdict open</span>
+    </div>
+    <div class="xp-rows">
+{%- for name, status, evidence in exploration_items %}
+      <div class="xp-row"><span class="xp-name">{{ name }}</span><span class="xp-chip {{ status }}">{{ status }}</span><span class="xp-ev">{{ evidence }}</span></div>
 {%- endfor %}
     </div>
+  </div>
+  <div class="chart-card" style="margin-bottom:0">
+    <div class="chart-title">Worth Restocking &mdash; Rated High, Not On Hand</div>
+    <div class="restock-head"><span style="flex:1">Wine</span><span class="rk-cat">Category</span><span class="rk-date">Last tasted</span><span class="rk-badge"></span></div>
+{%- for r in restock_items %}
+    <div class="restock-row{% if r.note %} has-note{% endif %}"{% if r.note %} onclick="var n=this.querySelector('.restock-note');if(n)n.classList.toggle('open')"{% endif %}>
+      <div class="rk-main">
+        <span class="rk-wine">{{ r.wine }}{% if r.note %} <span class="rk-note-ind">&#9656; note</span>{% endif %}</span>
+        <span class="rk-sub">{{ r.producer }} &middot; {{ r.vintage }}{% if r.times > 1 %} &middot; tasted {{ r.times }}&times;{% endif %}</span>
+{%- if r.note %}
+        <div class="restock-note">&ldquo;{{ r.note }}&rdquo;</div>
+{%- endif %}
+      </div>
+      <span class="rk-cat">{{ r.context }}</span>
+      <span class="rk-date">{{ r.date_label }}</span>
+      <span class="rk-badge"><span class="restock-badge">{{ r.rating }}</span></span>
+    </div>
+{%- endfor %}
+{%- if not restock_items %}
+    <div class="restock-row"><span class="rk-sub">Nothing currently qualifies &mdash; no cellar bottle depleted in the last six months rated very good or outstanding while missing from the shelf.</span></div>
+{%- endif %}
+{%- if tasted_outstanding or tasted_vg %}
+    <div class="tns-block">
+      <div class="tns-title">Tasted, never stocked</div>
+{%- for t in tasted_outstanding %}
+      <div class="restock-row{% if t.note %} has-note{% endif %}"{% if t.note %} onclick="var n=this.querySelector('.restock-note');if(n)n.classList.toggle('open')"{% endif %}>
+        <div class="rk-main">
+          <span class="rk-wine">{{ t.wine }}{% if t.note %} <span class="rk-note-ind">&#9656; note</span>{% endif %}</span>
+          <span class="rk-sub">{{ t.producer }} &middot; {{ t.vintage }}</span>
+{%- if t.note %}
+          <div class="restock-note">&ldquo;{{ t.note }}&rdquo;</div>
+{%- endif %}
+        </div>
+        <span class="rk-cat">{{ t.context }}</span>
+        <span class="rk-date">{{ t.date_label }}</span>
+        <span class="rk-badge"><span class="restock-badge outstanding">{{ t.rating }}</span></span>
+      </div>
+{%- endfor %}
+{%- if tasted_vg %}
+      <div class="tns-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">&#9656; {{ tasted_vg|length }} more rated very good</div>
+      <div class="tns-list">
+{%- for t in tasted_vg %}
+        <div class="tns-row"><span class="rk-wine">{{ t.wine }}</span><span class="rk-sub">{{ t.producer }} &middot; {{ t.vintage }}{% if t.context %} &middot; {{ t.context }}{% endif %} &middot; {{ t.date_label }}</span></div>
+{%- endfor %}
+      </div>
+{%- endif %}
+    </div>
+{%- endif %}
   </div>
 {%- if consumed_count > 0 %}
   <div class="narrative" style="margin-top:20px">
@@ -189,6 +241,19 @@
   </div>
 </div>
 
+<!-- DUPLICATE SKU CONFIRM -->
+<div class="rate-overlay" id="dupOverlay">
+  <div class="rate-dialog">
+    <div class="rate-title">Already In The Collection</div>
+    <div class="rate-wine-name" id="dupWineName"></div>
+    <div class="rate-body" id="dupMsg"></div>
+    <div class="rate-actions">
+      <button class="btn-secondary" id="dupCancelBtn">Don&rsquo;t Add</button>
+      <button class="btn-primary" id="dupConfirmBtn">Add to Existing</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT DRAWER -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="editDrawer">
@@ -282,6 +347,7 @@
 </div>
 
 <script>
+const BUILD_TS = "{{ build_ts }}";
 const WINES = {{ wines_json }};
 const CONSUMED = {{ consumed_json }};
 const CY = {{ cy }};
