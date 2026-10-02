@@ -121,8 +121,6 @@
   canvas{max-height:260px}
   .narrative{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:22px;margin-bottom:20px;line-height:1.75;font-size:14px;color:var(--cream)}
   .narrative h2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
-  .gap-item{background:var(--surface2);border-left:3px solid var(--gold);padding:8px 14px;margin-bottom:8px;border-radius:0 4px 4px 0;font-size:13px;color:var(--cream);line-height:1.55}
-  .gap-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:2px}
   .xp-legend{display:flex;gap:16px;font-size:11px;color:var(--soft);margin:4px 0 10px;align-items:center;flex-wrap:wrap}
   .xp-rows{border-top:1px solid var(--border)}
   .xp-row{display:flex;gap:12px;padding:9px 2px;border-bottom:1px solid var(--border);align-items:baseline;flex-wrap:wrap}

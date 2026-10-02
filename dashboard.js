@@ -25,27 +25,27 @@ function _computeDrinkStatus(w) {
 }
 function recomputeDerivedFields() {
   WINES.forEach(function(w) { w.drinkStatus = _computeDrinkStatus(w); });
-  if (typeof _recomputeQPR === 'function') _recomputeQPR();
+  _recomputeQPR();
 }
 recomputeDerivedFields();
 
 // CHARTS
 let _charts = {};
+const AX = { ticks:{color:'#9b8a7a'}, grid:{color:'rgba(58,37,53,.4)'} };   // shared axis style
+const LEG = { color:'#9b8a7a', font:{family:'Georgia'} };                    // shared legend label style
 function buildCharts() {
   Object.values(_charts).forEach(function(c){if(c)c.destroy();});
   _charts = {};
-  const def = { plugins:{ legend:{ labels:{ color:'#9b8a7a', font:{family:'Georgia'} } } }, scales:{ x:{ ticks:{color:'#9b8a7a'}, grid:{color:'rgba(58,37,53,.4)'} }, y:{ ticks:{color:'#9b8a7a'}, grid:{color:'rgba(58,37,53,.4)'} } } };
-
   // Country
   const cc = {}; WINES.forEach(w => cc[w.country] = (cc[w.country]||0)+w.qty);
   const cs = Object.entries(cc).sort((a,b)=>b[1]-a[1]);
   const ccols = ['#7c2d3f','#c9a84c','#9b5a6a','#5a7c9b','#7c9b5a','#9b7c5a','#6a5a9b','#b06a4a','#4a8c7c','#8c4a6a','#5a9b6a','#9b9b4a'];
-  _charts.cc = new Chart(document.getElementById('countryChart'), { type:'bar', data:{ labels:cs.map(e=>e[0]), datasets:[{ data:cs.map(e=>e[1]), backgroundColor:cs.map((e,i)=>ccols[i % ccols.length]), borderWidth:0 }] }, options:{ ...def, plugins:{ legend:{display:false} } } });
+  _charts.cc = new Chart(document.getElementById('countryChart'), { type:'bar', data:{ labels:cs.map(e=>e[0]), datasets:[{ data:cs.map(e=>e[1]), backgroundColor:cs.map((e,i)=>ccols[i % ccols.length]), borderWidth:0 }] }, options:{ plugins:{ legend:{display:false} }, scales:{ x:AX, y:AX } } });
 
   // Style donut
   const sc = {}; WINES.forEach(w => sc[w.style]=(sc[w.style]||0)+w.qty);
   const scols = { red:'#7c2d3f', white:'#c9a84c', sparkling:'#5a8c9b', "rosé":'#c97a8a', dessert:'#9b7c3a', orange:'#c97a3a' };
-  _charts.sc = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{ labels:Object.keys(sc).map(s=>s[0].toUpperCase()+s.slice(1)), datasets:[{ data:Object.values(sc), backgroundColor:Object.keys(sc).map(s=>scols[s]||'#777'), borderWidth:0, hoverOffset:6 }] }, options:{ plugins:{ legend:{ position:'right', labels:{ color:'#9b8a7a', font:{family:'Georgia'}, padding:12 } } }, cutout:'55%' } });
+  _charts.sc = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{ labels:Object.keys(sc).map(s=>s[0].toUpperCase()+s.slice(1)), datasets:[{ data:Object.values(sc), backgroundColor:Object.keys(sc).map(s=>scols[s]||'#777'), borderWidth:0, hoverOffset:6 }] }, options:{ plugins:{ legend:{ position:'right', labels:{ ...LEG, padding:12 } } }, cutout:'55%' } });
 
   // Varietal
   const vm = {};
@@ -67,7 +67,7 @@ function buildCharts() {
   };
   WINES.forEach(w => { const k=vn(w.varietal); vm[k]=(vm[k]||0)+w.qty; });
   const vs = Object.entries(vm).sort((a,b)=>b[1]-a[1]);
-  _charts.vc = new Chart(document.getElementById('varietalChart'), { type:'bar', data:{ labels:vs.map(e=>e[0]), datasets:[{ data:vs.map(e=>e[1]), backgroundColor:'#7c2d3f', borderWidth:0, hoverBackgroundColor:'#c9a84c' }] }, options:{ indexAxis:'y', plugins:{ legend:{display:false} }, scales:{ x:{ ticks:{color:'#9b8a7a'}, grid:{color:'rgba(58,37,53,.4)'} }, y:{ ticks:{color:'#e8ddd0', font:{size:12}}, grid:{color:'rgba(58,37,53,.2)'} } } } });
+  _charts.vc = new Chart(document.getElementById('varietalChart'), { type:'bar', data:{ labels:vs.map(e=>e[0]), datasets:[{ data:vs.map(e=>e[1]), backgroundColor:'#7c2d3f', borderWidth:0, hoverBackgroundColor:'#c9a84c' }] }, options:{ indexAxis:'y', plugins:{ legend:{display:false} }, scales:{ x:AX, y:{ ticks:{color:'#e8ddd0', font:{size:12}}, grid:{color:'rgba(58,37,53,.2)'} } } } });
 }
 buildCharts();
 
@@ -92,7 +92,7 @@ function renderWindows() {
     const fp = Math.max(0,Math.min(100,(w.drinkFrom-GSTART)/range*100));
     const tp = Math.max(0,Math.min(100,(w.drinkTo-GSTART)/range*100));
     const wp = Math.max(1,tp-fp);
-    const vd = typeof w.vintage==='string'?'NV':w.vintage;
+    const vd = _vd(w.vintage);
     return '<tr>'
       + '<td style="max-width:220px"><div class="wine-name">'+w.wine+'</div><div class="wine-producer">'+w.producer+'</div></td>'
       + '<td style="color:var(--muted);white-space:nowrap">'+vd+'</td>'
@@ -123,7 +123,7 @@ function renderProfiles() {
   });
   document.getElementById('resCount').textContent = f.length + ' wine' + (f.length!==1?'s':'');
   document.getElementById('cardGrid').innerHTML = f.map(w => {
-    const vd = typeof w.vintage==='string'?'NV':w.vintage;
+    const vd = _vd(w.vintage);
     const pp = w.purchasePrice ? '$'+w.purchasePrice+' paid · $'+w.marketPrice+' market' : '$'+w.marketPrice+' market';
     const disc = w.purchasePrice ? Math.round((1-w.purchasePrice/w.marketPrice)*100) : 0;
     const pb = w.pending ? '<span class="pending-badge" style="margin-left:4px">pending enrichment</span>' : '';
@@ -185,12 +185,12 @@ function renderQPR() {
     })).filter(d=>d.data.length) },
     options:{
       plugins:{
-        legend:{ labels:{ color:'#9b8a7a', font:{family:'Georgia'} } },
+        legend:{ labels:LEG },
         tooltip:{ callbacks:{ label: ctx => ctx.raw.label+' | Paid: $'+ctx.raw.paid+' | Market: $'+ctx.raw.market+' | Score: '+ctx.raw.score } }
       },
       scales:{
-        x:{ title:{display:true,text:'Purchase Price ($)',color:'#9b8a7a'}, ticks:{color:'#9b8a7a'}, grid:{color:'rgba(58,37,53,.4)'} },
-        y:{ title:{display:true,text:'Score',color:'#9b8a7a'}, min:85, ticks:{color:'#9b8a7a'}, grid:{color:'rgba(58,37,53,.4)'} }
+        x:{ ...AX, title:{display:true,text:'Purchase Price ($)',color:'#9b8a7a'} },
+        y:{ ...AX, title:{display:true,text:'Score',color:'#9b8a7a'}, min:85 }
       }
     }
   });
@@ -199,7 +199,7 @@ function renderQPR() {
     const paid = w.purchasePriceEff;
     const disc = (w.marketPrice && paid < w.marketPrice) ? Math.round((1-paid/w.marketPrice)*100) : 0;
     const qc = w.qprIndex>=7?'q-hi':w.qprIndex>=4?'q-mid':'q-lo';
-    const vd = typeof w.vintage==='string'?'NV':w.vintage;
+    const vd = _vd(w.vintage);
     return '<tr>'
       + '<td><div style="font-size:13px;color:var(--cream)">'+w.wine+'</div><div style="font-size:11px;color:var(--muted)">'+w.producer+' · '+w.appellation+'</div></td>'
       + '<td style="color:var(--muted)">'+vd+'</td>'
@@ -256,7 +256,7 @@ function renderInvList() {
     return [w.producer, w.wine, w.appellation, w.varietal || ""].join(" ").toLowerCase().indexOf(q) !== -1;
   });
   document.getElementById("invList").innerHTML = wines.map(function(w) {
-    var vd = typeof w.vintage === "string" ? "NV" : w.vintage;
+    var vd = _vd(w.vintage);
     var zc = w.qty === 0 ? " qty-zero" : "";
     var pb = w.pending ? " <span class=\"pending-badge\">pending</span>" : "";
     return '<div class="inv-row" id="inv-' + w.id + '">'
@@ -286,7 +286,7 @@ function adjustQty(id, delta) {
     var prev = w.qty;
     w.qty = w.qty + 1;
     _logChange("▲ " + w.producer + " — " + w.wine
-      + " (" + (typeof w.vintage === "string" ? "NV" : w.vintage) + "): qty " + prev + " → " + w.qty);
+      + " (" + _vd(w.vintage) + "): qty " + prev + " → " + w.qty);
     renderInvList();
   }
 }
@@ -296,88 +296,78 @@ function removeWine(id) {
   var w = WINES[idx];
   _openRateModal(w, idx);
 }
-function logTastingFromWine(id) {
-  var w = WINES.find(function(x){return x.id===id;});
-  if (!w) return;
-  var allIds = WINES.map(function(x){return x.id;}).concat(CONSUMED.map(function(x){return x.id;}));
-  var newId = allIds.length ? Math.max.apply(null, allIds) + 1 : 1;
-  var vintage = w.vintage;
-  var vd = typeof vintage === "string" ? "NV" : vintage;
-  var pendingEntry = Object.assign({}, w, {
-    id: newId, qty: 1, adhoc: true,
-    purchasePrice: null, purchasePriceEff: null, qprRaw: null, qprIndex: null
-  });
+// ── small shared helpers
+function _vd(v) { return typeof v === "string" ? "NV" : v; }
+function _today() { return new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date()); }
+function _nextId() {
+  return Math.max.apply(null, [0].concat(WINES.map(function(w){return w.id;}), CONSUMED.map(function(w){return w.id;}))) + 1;
+}
+function _flash(el, text, color) {
+  el.style.color = color;
+  el.textContent = text;
+  setTimeout(function(){ el.textContent = ""; }, 4000);
+}
+// Shared rating modal: onConfirm(rating|null, note|null, todayISO) fires on confirm; modal closes after.
+function _showRateModal(w, confirmLabel, onConfirm) {
   var overlay = document.getElementById("rateOverlay");
-  var nameEl = document.getElementById("rateWineName");
   var noteEl = document.getElementById("rateNote");
-  nameEl.textContent = w.producer + " — " + w.wine + " (" + vd + ")";
-  noteEl.value = "";
   var btns = document.querySelectorAll("#rateBtns .rate-btn");
-  btns.forEach(function(b){ b.classList.remove("selected"); b.onclick = function(){ btns.forEach(function(x){x.classList.remove("selected");}); b.classList.add("selected"); }; });
   var confirmBtn = document.getElementById("rateConfirmBtn");
   var cancelBtn = document.getElementById("rateCancelBtn");
-  confirmBtn.textContent = "Log Tasting";
+  document.getElementById("rateWineName").textContent = w.producer + " — " + w.wine + " (" + _vd(w.vintage) + ")";
+  noteEl.value = "";
+  btns.forEach(function(b){ b.classList.remove("selected"); b.onclick = function(){ btns.forEach(function(x){x.classList.remove("selected");}); b.classList.add("selected"); }; });
+  confirmBtn.textContent = confirmLabel;
   overlay.classList.add("open");
   function cleanup() { overlay.classList.remove("open"); confirmBtn.onclick = null; cancelBtn.onclick = null; }
   cancelBtn.onclick = cleanup;
   confirmBtn.onclick = function() {
     var sel = document.querySelector("#rateBtns .rate-btn.selected");
-    var rating = sel ? sel.getAttribute("data-val") : null;
-    var note = noteEl.value.trim() || null;
-    var today = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date());
-    pendingEntry.removedDate = today;
-    if (rating) pendingEntry.myRating = rating;
-    if (note) pendingEntry.myNote = note;
-    CONSUMED.push(pendingEntry);
-    _logChange("✶ Tasting: " + w.producer + " — " + w.wine + " (" + vd + ")"
-      + (rating ? " [" + rating + "]" : ""));
+    onConfirm(sel ? sel.getAttribute("data-val") : null, noteEl.value.trim() || null, _today());
     cleanup();
   };
 }
+// Push an adhoc tasting entry to CONSUMED (rating/note optional).
+function _commitTasting(entry, rating, note, today) {
+  entry.removedDate = today;
+  if (rating) entry.myRating = rating;
+  if (note) entry.myNote = note;
+  CONSUMED.push(entry);
+  _logChange("✶ Tasting: " + entry.producer + " — " + entry.wine + " (" + _vd(entry.vintage) + ")"
+    + (rating ? " [" + rating + "]" : ""));
+}
+function logTastingFromWine(id) {
+  var w = WINES.find(function(x){return x.id===id;});
+  if (!w) return;
+  var entry = Object.assign({}, w, {
+    id: _nextId(), qty: 1, adhoc: true,
+    purchasePrice: null, purchasePriceEff: null, qprRaw: null, qprIndex: null
+  });
+  _showRateModal(w, "Log Tasting", function(rating, note, today) { _commitTasting(entry, rating, note, today); });
+}
 function _openRateModal(w, idx, fromDecrement) {
-  var overlay = document.getElementById("rateOverlay");
-  var nameEl = document.getElementById("rateWineName");
-  var noteEl = document.getElementById("rateNote");
-  nameEl.textContent = w.producer + " — " + w.wine + " (" + (typeof w.vintage === "string" ? "NV" : w.vintage) + ")";
-  noteEl.value = "";
-  var btns = document.querySelectorAll("#rateBtns .rate-btn");
-  btns.forEach(function(b){ b.classList.remove("selected"); b.onclick = function(){ btns.forEach(function(x){x.classList.remove("selected");}); b.classList.add("selected"); }; });
-  var confirmBtn = document.getElementById("rateConfirmBtn");
-  var cancelBtn = document.getElementById("rateCancelBtn");
-  confirmBtn.textContent = (fromDecrement && w.qty > 1) ? "Log Bottle" : "Confirm Removal";
-  overlay.classList.add("open");
-  function cleanup() { overlay.classList.remove("open"); confirmBtn.onclick = null; cancelBtn.onclick = null; }
-  cancelBtn.onclick = cleanup;
-  confirmBtn.onclick = function() {
-    var sel = document.querySelector("#rateBtns .rate-btn.selected");
-    var rating = sel ? sel.getAttribute("data-val") : null;
-    var note = noteEl.value.trim() || null;
-    var today = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date());
+  _showRateModal(w, (fromDecrement && w.qty > 1) ? "Log Bottle" : "Confirm Removal", function(rating, note, today) {
     var entry = Object.assign({}, w, {removedDate: today, qty: 1});
     if (rating) entry.myRating = rating;
     if (note) entry.myNote = note;
     CONSUMED.push(entry);
-    var willRemove = !fromDecrement || w.qty <= 1;
-    if (willRemove) {
-      _logChange("✕ Consumed: " + w.producer + " — " + w.wine
-        + " (" + (typeof w.vintage === "string" ? "NV" : w.vintage) + ")"
-        + (rating ? " [" + rating + "]" : ""));
+    var label = w.producer + " — " + w.wine + " (" + _vd(w.vintage) + ")";
+    var tag = rating ? " [" + rating + "]" : "";
+    if (!fromDecrement || w.qty <= 1) {
+      _logChange("✕ Consumed: " + label + tag);
       WINES.splice(idx, 1);
     } else {
       var prev = w.qty;
       w.qty = prev - 1;
-      _logChange("▼ " + w.producer + " — " + w.wine
-        + " (" + (typeof w.vintage === "string" ? "NV" : w.vintage) + "): qty " + prev + " → " + w.qty
-        + (rating ? " [" + rating + "]" : ""));
+      _logChange("▼ " + label + ": qty " + prev + " → " + w.qty + tag);
     }
     _recomputeQPR();
     renderInvList();
     refreshStats();
-    cleanup();
-  };
+  });
 }
 function _openDupModal(existing, producer, wine, vintage, qty, purchasePrice, msg) {
-  var vd = (typeof vintage === "string") ? "NV" : vintage;
+  var vd = _vd(vintage);
   var overlay = document.getElementById("dupOverlay");
   var nameEl = document.getElementById("dupWineName");
   var msgEl = document.getElementById("dupMsg");
@@ -391,9 +381,7 @@ function _openDupModal(existing, producer, wine, vintage, qty, purchasePrice, ms
   function cleanup() { overlay.classList.remove("open"); confirmBtn.onclick = null; cancelBtn.onclick = null; }
   cancelBtn.onclick = function() {
     cleanup();
-    msg.style.color = "#e0a050";
-    msg.textContent = "Not added \u2014 " + wine + " is already in the collection.";
-    setTimeout(function(){msg.textContent="";}, 4000);
+    _flash(msg, "Not added \u2014 " + wine + " is already in the collection.", "#e0a050");
   };
   confirmBtn.onclick = function() {
     var prev = existing.qty;
@@ -411,34 +399,42 @@ function _openDupModal(existing, producer, wine, vintage, qty, purchasePrice, ms
     renderInvList();
     refreshStats();
     cleanup();
-    msg.style.color = "#4caf7a";
-    msg.textContent = "\u2713 Added " + qty + " to existing SKU \u2014 " + wine + " now \u00d7" + existing.qty + ".";
-    setTimeout(function(){msg.textContent="";}, 4000);
+    _flash(msg, "\u2713 Added " + qty + " to existing SKU \u2014 " + wine + " now \u00d7" + existing.qty + ".", "#4caf7a");
   };
 }
-function addWine() {
-  var producer = document.getElementById("f-producer").value.trim();
-  var wine = document.getElementById("f-wine").value.trim();
-  var country = document.getElementById("f-country").value;
-  var style = document.getElementById("f-style").value;
-  var qty = parseInt(document.getElementById("f-qty").value) || 1;
-  var msg = document.getElementById("add-msg");
-  if (!producer || !wine || !country || !style) {
+// Reads the Add Wine form; returns null (after flashing an error) if a required field is missing.
+function _readAddForm() {
+  var f = {
+    producer: document.getElementById("f-producer").value.trim(),
+    wine: document.getElementById("f-wine").value.trim(),
+    country: document.getElementById("f-country").value,
+    style: document.getElementById("f-style").value
+  };
+  if (!f.producer || !f.wine || !f.country || !f.style) {
+    var msg = document.getElementById("add-msg");
     msg.style.color = "#e05050";
     msg.textContent = "Producer, Wine, Country and Style are required.";
-    return;
+    return null;
   }
-  var appellation = document.getElementById("f-appellation").value.trim() || "";
-  var region = document.getElementById("f-region").value.trim() || country;
-  var varietal = document.getElementById("f-varietal").value.trim() || "";
   var vintageRaw = document.getElementById("f-vintage").value;
-  var vintage = vintageRaw ? parseInt(vintageRaw) : "NV";
+  f.appellation = document.getElementById("f-appellation").value.trim();
+  f.region = document.getElementById("f-region").value.trim() || f.country;
+  f.varietal = document.getElementById("f-varietal").value.trim();
+  f.vintage = vintageRaw ? parseInt(vintageRaw) : "NV";
+  f.marketPrice = parseFloat(document.getElementById("f-market").value) || null;
+  return f;
+}
+function addWine() {
+  var msg = document.getElementById("add-msg");
+  var f = _readAddForm();
+  if (!f) return;
+  var producer = f.producer, wine = f.wine, vintage = f.vintage;
+  var qty = parseInt(document.getElementById("f-qty").value) || 1;
   var purchasePrice = parseFloat(document.getElementById("f-purchase").value) || null;
-  var marketPrice = parseFloat(document.getElementById("f-market").value) || null;
+  var marketPrice = f.marketPrice;
   var score = parseInt(document.getElementById("f-score").value) || 88;
   var drinkFrom = parseInt(document.getElementById("f-from").value) || CY;
   var drinkTo = parseInt(document.getElementById("f-to").value) || (CY + 5);
-  var purchasePriceEff = purchasePrice || null;
   // Duplicate-SKU guard: a repeat purchase of a wine already in the collection
   // raises qty on the existing SKU instead of creating a second one. Mirrors the
   // normalized producer+wine+vintage key used by --pull-forms in generate_dashboard.py.
@@ -457,92 +453,46 @@ function addWine() {
     return;
   }
 
-  var allIds = WINES.map(function(w){return w.id;}).concat(CONSUMED.map(function(w){return w.id;}));
-  var newId = allIds.length ? Math.max.apply(null, allIds) + 1 : 1;
+  var scan = window._scanPending, scanned = !!(scan && scan.pairings && scan.pairings.length);
   WINES.push({
-    id: newId, producer: producer, wine: wine, appellation: appellation,
-    country: country, region: region, vintage: vintage, qty: qty,
-    varietal: varietal, style: style,
+    id: _nextId(), producer: producer, wine: wine, appellation: f.appellation,
+    country: f.country, region: f.region, vintage: vintage, qty: qty,
+    varietal: f.varietal, style: f.style,
     purchasePrice: purchasePrice, marketPrice: marketPrice || purchasePrice || 0,
     score: score, drinkFrom: drinkFrom, drinkTo: drinkTo,
-    pairings: (window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length) ? window._scanPending.pairings : ["Pending enrichment"],
-    summary: (window._scanPending && window._scanPending.summary) ? window._scanPending.summary : "Added manually — bring this file to Claude to complete tasting notes, pairings, and vintage context.",
-    purchasePriceEff: purchasePriceEff, qprRaw: null, qprIndex: null,
-    pending: !(window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length)
+    pairings: scanned ? scan.pairings : ["Pending enrichment"],
+    summary: (scan && scan.summary) ? scan.summary : "Added manually — bring this file to Claude to complete tasting notes, pairings, and vintage context.",
+    purchasePriceEff: purchasePrice, qprRaw: null, qprIndex: null,
+    pending: !scanned
   });
   window._scanPending = null;
   recomputeDerivedFields();  // fills in drinkStatus + QPR for the new wine
-  _logChange("+ Added: " + producer + " — " + wine
-    + " (" + (typeof vintage === "string" ? "NV" : vintage) + ") ×" + qty);
+  _logChange("+ Added: " + producer + " — " + wine + " (" + _vd(vintage) + ") ×" + qty);
   clearAddForm();
-  msg.style.color = "#4caf7a";
-  msg.textContent = "✓ Added \"" + wine + "\" — switch to Inventory to verify.";
-  setTimeout(function(){msg.textContent="";}, 4000);
+  _flash(msg, "✓ Added \"" + wine + "\" — switch to Inventory to verify.", "#4caf7a");
 }
 function logTasting() {
-  var producer = document.getElementById("f-producer").value.trim();
-  var wine = document.getElementById("f-wine").value.trim();
-  var country = document.getElementById("f-country").value;
-  var style = document.getElementById("f-style").value;
   var msg = document.getElementById("add-msg");
-  if (!producer || !wine || !country || !style) {
-    msg.style.color = "#e05050";
-    msg.textContent = "Producer, Wine, Country and Style are required.";
-    return;
-  }
-  var appellation = document.getElementById("f-appellation").value.trim() || "";
-  var region = document.getElementById("f-region").value.trim() || country;
-  var varietal = document.getElementById("f-varietal").value.trim() || "";
-  var vintageRaw = document.getElementById("f-vintage").value;
-  var vintage = vintageRaw ? parseInt(vintageRaw) : "NV";
-  var marketPrice = parseFloat(document.getElementById("f-market").value) || null;
-  var score = parseInt(document.getElementById("f-score").value) || null;
-  var drinkFrom = parseInt(document.getElementById("f-from").value) || null;
-  var drinkTo = parseInt(document.getElementById("f-to").value) || null;
-  var allIds = WINES.map(function(w){return w.id;}).concat(CONSUMED.map(function(w){return w.id;}));
-  var newId = allIds.length ? Math.max.apply(null, allIds) + 1 : 1;
-  var pendingEntry = {
-    id: newId, producer: producer, wine: wine, appellation: appellation,
-    country: country, region: region, vintage: vintage, varietal: varietal,
-    style: style, score: score, marketPrice: marketPrice,
+  var f = _readAddForm();
+  if (!f) return;
+  var scan = window._scanPending;
+  var entry = {
+    id: _nextId(), producer: f.producer, wine: f.wine, appellation: f.appellation,
+    country: f.country, region: f.region, vintage: f.vintage, varietal: f.varietal,
+    style: f.style, score: parseInt(document.getElementById("f-score").value) || null, marketPrice: f.marketPrice,
     purchasePrice: null, purchasePriceEff: null, qprRaw: null, qprIndex: null,
-    drinkFrom: drinkFrom, drinkTo: drinkTo,
-    pairings: (window._scanPending && window._scanPending.pairings && window._scanPending.pairings.length) ? window._scanPending.pairings : [],
-    summary: (window._scanPending && window._scanPending.summary) ? window._scanPending.summary : "",
+    drinkFrom: parseInt(document.getElementById("f-from").value) || null,
+    drinkTo: parseInt(document.getElementById("f-to").value) || null,
+    pairings: (scan && scan.pairings && scan.pairings.length) ? scan.pairings : [],
+    summary: (scan && scan.summary) ? scan.summary : "",
     qty: 1, adhoc: true
   };
   window._scanPending = null;
-  var overlay = document.getElementById("rateOverlay");
-  var nameEl = document.getElementById("rateWineName");
-  var noteEl = document.getElementById("rateNote");
-  nameEl.textContent = producer + " — " + wine + " (" + (typeof vintage === "string" ? "NV" : vintage) + ")";
-  noteEl.value = "";
-  var btns = document.querySelectorAll("#rateBtns .rate-btn");
-  btns.forEach(function(b){ b.classList.remove("selected"); b.onclick = function(){ btns.forEach(function(x){x.classList.remove("selected");}); b.classList.add("selected"); }; });
-  var confirmBtn = document.getElementById("rateConfirmBtn");
-  var cancelBtn = document.getElementById("rateCancelBtn");
-  confirmBtn.textContent = "Log Tasting";
-  overlay.classList.add("open");
-  function cleanup() { overlay.classList.remove("open"); confirmBtn.onclick = null; cancelBtn.onclick = null; }
-  cancelBtn.onclick = cleanup;
-  confirmBtn.onclick = function() {
-    var sel = document.querySelector("#rateBtns .rate-btn.selected");
-    var rating = sel ? sel.getAttribute("data-val") : null;
-    var note = noteEl.value.trim() || null;
-    var today = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/New_York'}).format(new Date());
-    pendingEntry.removedDate = today;
-    if (rating) pendingEntry.myRating = rating;
-    if (note) pendingEntry.myNote = note;
-    CONSUMED.push(pendingEntry);
-    _logChange("✶ Tasting: " + producer + " — " + wine
-      + " (" + (typeof vintage === "string" ? "NV" : vintage) + ")"
-      + (rating ? " [" + rating + "]" : ""));
+  _showRateModal(entry, "Log Tasting", function(rating, note, today) {
+    _commitTasting(entry, rating, note, today);
     clearAddForm();
-    msg.style.color = "#4caf7a";
-    msg.textContent = "✓ Tasting logged — visible in Drinking History.";
-    setTimeout(function(){msg.textContent="";}, 4000);
-    cleanup();
-  };
+    _flash(msg, "✓ Tasting logged — visible in Drinking History.", "#4caf7a");
+  });
 }
 function clearAddForm() {
   ["f-producer","f-wine","f-appellation","f-varietal","f-region"].forEach(function(id){document.getElementById(id).value="";});
@@ -600,7 +550,7 @@ function renderHistory() {
   if (empty) empty.style.display = "none";
   var sorted = CONSUMED.slice().sort(function(a,b){ return (b.removedDate||"").localeCompare(a.removedDate||""); });
   body.innerHTML = sorted.map(function(w) {
-    var vd = typeof w.vintage === "string" ? "NV" : w.vintage;
+    var vd = _vd(w.vintage);
     var score = (w.score != null && w.score !== 0) ? w.score : "—";
     var style = w.style ? (w.style[0].toUpperCase() + w.style.slice(1)) : "—";
     var rating = w.myRating ? (w.myRating[0].toUpperCase() + w.myRating.slice(1)) : "—";
@@ -640,10 +590,10 @@ function exportHTML() {
   src = src.replace(/class="drawer-overlay open"/g, 'class="drawer-overlay"');
   src = src.replace(/class="drawer open"/g, 'class="drawer"');
   src = src.replace(/class="rate-overlay open"/g, 'class="rate-overlay"');
-  var winesStr = 'const WINES = ' + JSON.stringify(WINES, null, '\n') + ';';
-  src = src.replace(/const WINES = \[[\s\S]*?\];/, winesStr);
-  var consumedStr = 'const CONSUMED = ' + JSON.stringify(CONSUMED, null, '\n') + ';';
-  src = src.replace(/const CONSUMED = \[[\s\S]*?\];/, consumedStr);
+  // Function replacers: a string replacement would mangle "$&"-style sequences in wine data.
+  var embed = function(d) { return JSON.stringify(d).replace(/<\//g, '<\\/'); };
+  src = src.replace(/const WINES = \[[\s\S]*?\];/, function() { return 'const WINES = ' + embed(WINES) + ';'; });
+  src = src.replace(/const CONSUMED = \[[\s\S]*?\];/, function() { return 'const CONSUMED = ' + embed(CONSUMED) + ';'; });
   var d = new Date(), fn = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '_Wine Cellar Dashboard.html';
   _dlBlob(fn, src, 'text/html');
   _logChange('\u2193 Exported ' + fn);

@@ -18,17 +18,22 @@ Curated narrative text lives in OVERVIEW_PARAS and EXPLORATION_ITEMS below.
 Update those when the collection changes significantly.
 """
 
+import argparse
+import glob
 import io
 import json
 import os
 import re
+import shutil
 import sys
-import argparse
-import zipfile
-import urllib.request
 import urllib.error
-from datetime import datetime
+import urllib.request
+import zipfile
+from collections import Counter
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+from jinja2 import Environment, FileSystemLoader
 
 _eastern = ZoneInfo('America/New_York')
 def _today():
@@ -46,6 +51,27 @@ def _sku_key(e):
 # ── locate files ──────────────────────────────────────────────────────────────
 DIR = os.path.dirname(os.path.abspath(__file__))
 JSON_PATH = os.path.join(DIR, 'wines.json')
+STATE_PATH = os.path.join(DIR, 'netlify_forms_state.json')
+
+def _load_data():
+    """Return (wines, consumed) from wines.json; a legacy flat array counts as wines-only."""
+    if not os.path.exists(JSON_PATH):
+        return [], []
+    with open(JSON_PATH, 'r', encoding='utf-8') as f:
+        raw = json.load(f)
+    if isinstance(raw, list):
+        return raw, []
+    return raw.get('wines', []), raw.get('consumed', [])
+
+def _save_data(wines, consumed):
+    with open(JSON_PATH, 'w', encoding='utf-8') as f:
+        json.dump({'wines': wines, 'consumed': consumed}, f, indent=2, ensure_ascii=False)
+
+def _load_state():
+    if not os.path.exists(STATE_PATH):
+        return {}
+    with open(STATE_PATH, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 # ── sync from HTML (--sync flag) ─────────────────────────────────────────────
 def _sync_from_html(html_path):
@@ -68,17 +94,7 @@ def _sync_from_html(html_path):
     m_build = re.search(r'const BUILD_TS = "([^"]*)";', html)
     build_ts = m_build.group(1) if m_build else None
 
-    # Load current wines.json for diffing
-    if os.path.exists(JSON_PATH):
-        with open(JSON_PATH, 'r', encoding='utf-8') as f:
-            raw = json.load(f)
-        if isinstance(raw, list):
-            json_wines, json_consumed = raw, []
-        else:
-            json_wines = raw.get('wines', [])
-            json_consumed = raw.get('consumed', [])
-    else:
-        json_wines, json_consumed = [], []
+    json_wines, json_consumed = _load_data()
 
     # Diff
     json_wine_ids = {w['id'] for w in json_wines}
@@ -124,13 +140,8 @@ def _sync_from_html(html_path):
 
     # Warn if this export predates the last form pull: form-added entries the export
     # never saw would be dropped by the wholesale write below. Warning only — no retention.
-    _state_path = os.path.join(DIR, 'netlify_forms_state.json')
-    _last_pull, _merge_log = None, []
-    if os.path.exists(_state_path):
-        with open(_state_path, 'r', encoding='utf-8') as _sf:
-            _st = json.load(_sf)
-            _last_pull = _st.get('last_pull_at')
-            _merge_log = _st.get('merge_log', [])
+    _st = _load_state()
+    _last_pull, _merge_log = _st.get('last_pull_at'), _st.get('merge_log', [])
     if build_ts and _last_pull and _last_pull > build_ts:
         _html_ids = html_wine_ids | html_consumed_ids
         _at_risk = [e for e in json_wines + json_consumed
@@ -172,8 +183,7 @@ def _sync_from_html(html_path):
                 c['myNote'] = prev['myNote']
 
     # Write updated wines.json
-    with open(JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump({'wines': html_wines, 'consumed': html_consumed}, f, indent=2, ensure_ascii=False)
+    _save_data(html_wines, html_consumed)
     print('  Updated: ' + JSON_PATH)
 
 # ── parse args ────────────────────────────────────────────────────────────────
@@ -217,14 +227,8 @@ def _pull_netlify_forms():
         print('--pull-forms: netlify.env missing or token not set — skipping.')
         return 0
 
-    state_path = os.path.join(DIR, 'netlify_forms_state.json')
-
     # Step 1 — Load state
-    if os.path.exists(state_path):
-        with open(state_path, 'r', encoding='utf-8') as _f:
-            _state = json.load(_f)
-    else:
-        _state = {}
+    _state = _load_state()
     processed_ids = set(_state.get('processed_ids', []))
 
     headers = {'Authorization': 'Bearer ' + token}
@@ -272,17 +276,7 @@ def _pull_netlify_forms():
         print('--pull-forms: 0 new submissions.')
         return 0
 
-    # Load current wines.json
-    if os.path.exists(JSON_PATH):
-        with open(JSON_PATH, 'r', encoding='utf-8') as _f:
-            _raw2 = json.load(_f)
-        if isinstance(_raw2, list):
-            _wines2, _consumed2 = _raw2, []
-        else:
-            _wines2 = _raw2.get('wines', [])
-            _consumed2 = _raw2.get('consumed', [])
-    else:
-        _wines2, _consumed2 = [], []
+    _wines2, _consumed2 = _load_data()
 
     def _parse_int_or_none(val):
         try: return int(val)
@@ -424,8 +418,7 @@ def _pull_netlify_forms():
     else:
         # Step 5 — Merge and write
         _consumed2.extend(new_entries)
-        with open(JSON_PATH, 'w', encoding='utf-8') as _f:
-            json.dump({'wines': _wines2, 'consumed': _consumed2}, _f, indent=2, ensure_ascii=False)
+        _save_data(_wines2, _consumed2)
         if new_entries:
             print('Pulled ' + str(len(new_entries)) + ' tasting submission(s) from Netlify Forms.')
             for e in new_entries:
@@ -448,7 +441,7 @@ def _pull_netlify_forms():
     # Step 6 — Update state
     processed_ids.update(new_processed_ids)
     _state['processed_ids'] = sorted(processed_ids)
-    with open(state_path, 'w', encoding='utf-8') as _f:
+    with open(STATE_PATH, 'w', encoding='utf-8') as _f:
         json.dump(_state, _f, indent=2)
     return changed
 
@@ -458,16 +451,7 @@ if _args.pull_forms:
         print('--only-if-new: nothing new — skipping regenerate/deploy.')
         sys.exit(0)
 
-with open(JSON_PATH, 'r', encoding='utf-8') as f:
-    _raw = json.load(f)
-
-# Support both flat array (legacy) and two-array format
-if isinstance(_raw, list):
-    wines = _raw
-    consumed = []
-else:
-    wines = _raw.get('wines', [])
-    consumed = _raw.get('consumed', [])
+wines, consumed = _load_data()
 
 # ── current year (embedded as a JS constant, also used in stats below) ───────
 # Per-wine derived fields (drinkStatus, qprRaw, qprIndex, purchasePriceEff) are
@@ -479,11 +463,8 @@ CY = _today().year
 # ── compute stats ─────────────────────────────────────────────────────────────
 total_bottles = sum(w['qty'] for w in wines)
 sku_count = len(wines)
-countries = sorted(set(w['country'] for w in wines))
-country_count = len(countries)
-_country_counts = {}
-for w in wines:
-    _country_counts[w['country']] = _country_counts.get(w['country'], 0) + 1
+_country_counts = Counter(w['country'] for w in wines)
+country_count = len(_country_counts)
 france_count = _country_counts.get('France', 0)
 usa_count = _country_counts.get('USA', 0)
 italy_count = _country_counts.get('Italy', 0)
@@ -493,14 +474,13 @@ mv_str = ('$' + str(round(market_value / 1000, 1)) + 'k') if market_value >= 100
 vintages = [w['vintage'] for w in wines if isinstance(w['vintage'], int)]
 vintage_span = (str(min(vintages)) + '\u2013' + str(max(vintages))) if vintages else '\u2014'
 
-style_counts = {}
+style_counts = Counter()
 for w in wines:
-    style_counts[w['style']] = style_counts.get(w['style'], 0) + w['qty']
-red_count = style_counts.get('red', 0)
-sparkling_count = style_counts.get('sparkling', 0)
-white_count = style_counts.get('white', 0)
-rose_count = style_counts.get('rosé', 0)
-dessert_count = style_counts.get('dessert', 0)
+    style_counts[w['style']] += w['qty']
+red_count = style_counts['red']
+sparkling_count = style_counts['sparkling']
+white_count = style_counts['white']
+rose_count = style_counts['rosé']
 
 urgent_wines = [w for w in wines if w.get('drinkTo') and w['drinkTo'] <= CY]
 urgent_count = len(urgent_wines)
@@ -520,20 +500,12 @@ int_vintage_wines = [w for w in wines if isinstance(w['vintage'], int)]
 oldest = min(int_vintage_wines, key=lambda w: w['vintage']) if int_vintage_wines else None
 oldest_label = (oldest['producer'] + ' ' + oldest['wine'] + ' ' + str(oldest['vintage'])) if oldest else 'the oldest bottle'
 
-pre2010 = sorted(
-    [w for w in wines if isinstance(w['vintage'], int) and w['vintage'] < 2010],
-    key=lambda w: w['vintage']
-)
-pre2010_names = ', '.join(w['producer'] + ' ' + str(w['vintage']) for w in pre2010) \
-    if pre2010 else 'essentially none'
-
 multi_btl = sorted([w for w in wines if w['qty'] > 1], key=lambda w: -w['qty'])
 multi_btl_str = ', '.join(
     w['producer'] + ' ' + w['wine'].split('(')[0].strip() + ' (' + str(w['qty']) + ' btls)' for w in multi_btl
 ) if multi_btl else 'none'
 
-priced_wines = [w for w in wines if w.get('purchasePrice')]
-priced_count = len(priced_wines)
+priced_count = sum(1 for w in wines if w.get('purchasePrice'))
 total_count = len(wines)
 
 _scored = [w['score'] for w in wines if w.get('score')]
@@ -541,73 +513,28 @@ avg_score = round(sum(_scored) / len(_scored), 1) if _scored else 0
 _priced_eff = [w['purchasePriceEff'] for w in wines if w.get('purchasePriceEff')]
 price_min = min(_priced_eff) if _priced_eff else 0
 price_max = max(_priced_eff) if _priced_eff else 0
-rndc_count = len([w for w in wines if w.get('purchasePriceEff') == 18])
+rndc_count = sum(1 for w in wines if w.get('purchasePriceEff') == 18)
 
 # ── consumed stats ────────────────────────────────────────────────────────────
 consumed_count = len(consumed)
-rated_consumed = [c for c in consumed if c.get('myRating')]
-rated_count = len(rated_consumed)
-
 _sat_order = ['faulty', 'poor', 'acceptable', 'good', 'very good', 'outstanding']
-rating_dist = {}
-for c in rated_consumed:
-    r = c.get('myRating', '')
-    rating_dist[r] = rating_dist.get(r, 0) + 1
-
-# Build rating distribution string in SAT order
-rating_parts = []
-for level in _sat_order:
-    n = rating_dist.get(level, 0)
-    if n > 0:
-        rating_parts.append(str(n) + ' ' + level)
-rating_dist_str = ', '.join(rating_parts) if rating_parts else 'none rated yet'
-
-# Top-rated bottle
-top_rated = None
-if rated_consumed:
-    top_rated = max(rated_consumed, key=lambda c: _sat_order.index(c.get('myRating', 'faulty')))
-top_rated_str = ''
-if top_rated:
-    top_rated_str = (top_rated['producer'] + ' ' + top_rated['wine'] + ' '
-                     + str(top_rated['vintage']) + ' (' + top_rated['myRating'] + ')')
-
-# Consumed styles
-consumed_styles = {}
-for c in consumed:
-    consumed_styles[c['style']] = consumed_styles.get(c['style'], 0) + 1
-consumed_style_parts = []
-for s in ['red', 'white', 'sparkling', 'rosé', 'dessert', 'orange']:
-    n = consumed_styles.get(s, 0)
-    if n > 0:
-        consumed_style_parts.append(str(n) + ' ' + s)
-consumed_styles_str = ', '.join(consumed_style_parts) if consumed_style_parts else ''
+_style_order = ['red', 'white', 'sparkling', 'rosé', 'dessert', 'orange']
 
 # ── consumed split: bottles depleted from the cellar vs ad-hoc tastings ───────
 def _group_stats(entries):
+    """Rating/style summary strings and top-rated entry for a slice of consumed."""
     rated = [c for c in entries if c.get('myRating')]
-    dist = {}
+    dist, styles = {}, {}
     for c in rated:
         dist[c['myRating']] = dist.get(c['myRating'], 0) + 1
-    parts = []
-    for level in _sat_order:
-        if dist.get(level, 0) > 0:
-            parts.append(str(dist[level]) + ' ' + level)
-    rating_str = ', '.join(parts) if parts else 'none rated yet'
-    styles = {}
     for c in entries:
         styles[c['style']] = styles.get(c['style'], 0) + 1
-    style_parts = []
-    for s in ['red', 'white', 'sparkling', 'rosé', 'dessert', 'orange']:
-        if styles.get(s, 0) > 0:
-            style_parts.append(str(styles[s]) + ' ' + s)
-    styles_str = ', '.join(style_parts)
-    top = max(rated, key=lambda c: _sat_order.index(c['myRating'])) if rated else None
     return {
         'count': len(entries),
         'rated': len(rated),
-        'rating_str': rating_str,
-        'styles_str': styles_str,
-        'top': top,
+        'rating_str': ', '.join(str(dist[l]) + ' ' + l for l in _sat_order if dist.get(l)) or 'none rated yet',
+        'styles_str': ', '.join(str(styles[s]) + ' ' + s for s in _style_order if styles.get(s)),
+        'top': max(rated, key=lambda c: _sat_order.index(c['myRating'])) if rated else None,
     }
 
 depleted_stats = _group_stats([c for c in consumed if not c.get('adhoc')])
@@ -620,19 +547,16 @@ tasted_stats = _group_stats([c for c in consumed if c.get('adhoc')])
 # the bar for the collection is higher than everyday drinking).
 # Matching normalizes producer+wine (lowercase, strip non-alphanumeric) so
 # punctuation variants ('Riesling "RR"' vs 'Riesling RR') don't break it.
-import re as _re
-
 def _norm_key(e):
     s = str(e.get('producer', '')) + ' ' + str(e.get('wine', ''))
-    return _re.sub(r'[^a-z0-9]', '', s.lower())
+    return re.sub(r'[^a-z0-9]', '', s.lower())
 
 _active_keys = set(_norm_key(w) for w in wines)
 _HIGH = ('very good', 'outstanding')
 
 # Rolling window: only depletions from the last ~6 months qualify. Un-acted-on
 # candidates age out, keeping the list a *current* shopping aid.
-from datetime import timedelta as _td
-_restock_cutoff = (_today() - _td(days=183)).strftime('%Y-%m-%d')
+_restock_cutoff = (_today() - timedelta(days=183)).strftime('%Y-%m-%d')
 
 # (wine, vintage) pairs ever depleted from the cellar (any rating). Vintage-
 # aware on purpose: a full-bottle verdict only supersedes pours of the SAME
@@ -817,8 +741,6 @@ EXPLORATION_ITEMS = [
 # Rule: one active dashboard in the folder at a time.
 #   - Same day as existing file  → overwrite in place (no archive)
 #   - Newer day than existing    → move old file to Archive/, write new dated file
-import glob, shutil
-
 today_str = _today().strftime('%Y%m%d')
 out_path = os.path.join(DIR, today_str + '_Wine Cellar Dashboard.html')
 
@@ -831,8 +753,11 @@ for old_file in existing:
     print('Archived: ' + os.path.basename(old_file))
 
 # ── embed WINES and CONSUMED arrays ──────────────────────────────────────────
-wines_json = json.dumps(wines, ensure_ascii=False, indent=2)
-consumed_json = json.dumps(consumed, ensure_ascii=False, indent=2)
+# Compact JSON; '</' is escaped so no string can close the inline <script>.
+def _embed(data):
+    return json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
+wines_json = _embed(wines)
+consumed_json = _embed(consumed)
 
 # ── load external CSS and JS ──────────────────────────────────────────────────
 # Stylesheet and dashboard logic live in their own files so they can be edited
@@ -846,8 +771,6 @@ with open(os.path.join(DIR, 'dashboard.js'), 'r', encoding='utf-8') as _f:
 # ── render HTML via Jinja2 template ────────────────────────────────────────────
 # All HTML structure lives in template.html.j2. This script supplies the
 # computed values; Jinja handles the assembly.
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 _env = Environment(
     loader=FileSystemLoader(DIR),
     autoescape=False,           # output is treated as raw HTML; values from
@@ -872,10 +795,6 @@ _html = _template.render(
     tasted_vg=tasted_vg,
     # drinking notes (conditional block)
     consumed_count=consumed_count,
-    rated_count=rated_count,
-    rating_dist_str=rating_dist_str,
-    consumed_styles_str=consumed_styles_str,
-    top_rated=top_rated,
     depleted_stats=depleted_stats,
     tasted_stats=tasted_stats,
     # QPR methodology
@@ -900,6 +819,17 @@ print('  Market value: ' + mv_str)
 print('  Vintage span: ' + vintage_span)
 
 # ── deploy to Netlify (if netlify.env is configured) ─────────────────────────
+_CELLAR_FIELDS = ['producer', 'wine', 'vintage', 'qty', 'style', 'country', 'region',
+                  'subRegion', 'tier', 'varietal', 'score', 'drinkFrom', 'drinkTo',
+                  'pairings', 'summary']
+
+def _cellar_json():
+    """Compact active-collection snapshot for chat queries (served at /cellar.json)."""
+    return json.dumps({
+        'generatedAt': _now_iso(),
+        'wines': [{k: w.get(k) for k in _CELLAR_FIELDS} for w in wines],
+    }, ensure_ascii=False, indent=1)
+
 def _deploy_to_netlify(html_path):
     """Zip the generated HTML as index.html and deploy to Netlify via the zip-deploy API."""
     site_id, token = _load_netlify_env()
@@ -921,6 +851,7 @@ def _deploy_to_netlify(html_path):
         log_path = os.path.join(DIR, 'log.html')
         if os.path.exists(log_path):
             zf.write(log_path, 'log.html')
+        zf.writestr('cellar.json', _cellar_json())
     buf.seek(0)
     payload = buf.read()
 

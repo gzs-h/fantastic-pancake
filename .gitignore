@@ -21,3 +21,8 @@ netlify.env
 
 # Netlify Forms dedup state (local only)
 netlify_forms_state.json
+
+# Claude review artifacts / delivered outputs
+Claude outputs/
+*-review.html
+*-review.xlsx

@@ -9,6 +9,20 @@
 {{ css }}</style>
 </head>
 <body>
+{%- macro restock_row(r, badge_cls='', show_times=false) %}
+<div class="restock-row{% if r.note %} has-note{% endif %}"{% if r.note %} onclick="var n=this.querySelector('.restock-note');if(n)n.classList.toggle('open')"{% endif %}>
+      <div class="rk-main">
+        <span class="rk-wine">{{ r.wine }}{% if r.note %} <span class="rk-note-ind">&#9656; note</span>{% endif %}</span>
+        <span class="rk-sub">{{ r.producer }} &middot; {{ r.vintage }}{% if show_times and r.times > 1 %} &middot; tasted {{ r.times }}&times;{% endif %}</span>
+{%- if r.note %}
+        <div class="restock-note">&ldquo;{{ r.note }}&rdquo;</div>
+{%- endif %}
+      </div>
+      <span class="rk-cat">{{ r.context }}</span>
+      <span class="rk-date">{{ r.date_label }}</span>
+      <span class="rk-badge"><span class="restock-badge{{ badge_cls }}">{{ r.rating }}</span></span>
+    </div>
+{%- endmacro %}
 <nav>
   <div class="nav-brand">&#9670; Cellar</div>
   <div class="nav-tabs">
@@ -62,18 +76,7 @@
     <div class="chart-title">Worth Restocking &mdash; Rated High, Not On Hand</div>
     <div class="restock-head"><span style="flex:1">Wine</span><span class="rk-cat">Category</span><span class="rk-date">Last tasted</span><span class="rk-badge"></span></div>
 {%- for r in restock_items %}
-    <div class="restock-row{% if r.note %} has-note{% endif %}"{% if r.note %} onclick="var n=this.querySelector('.restock-note');if(n)n.classList.toggle('open')"{% endif %}>
-      <div class="rk-main">
-        <span class="rk-wine">{{ r.wine }}{% if r.note %} <span class="rk-note-ind">&#9656; note</span>{% endif %}</span>
-        <span class="rk-sub">{{ r.producer }} &middot; {{ r.vintage }}{% if r.times > 1 %} &middot; tasted {{ r.times }}&times;{% endif %}</span>
-{%- if r.note %}
-        <div class="restock-note">&ldquo;{{ r.note }}&rdquo;</div>
-{%- endif %}
-      </div>
-      <span class="rk-cat">{{ r.context }}</span>
-      <span class="rk-date">{{ r.date_label }}</span>
-      <span class="rk-badge"><span class="restock-badge">{{ r.rating }}</span></span>
-    </div>
+    {{ restock_row(r, show_times=true) }}
 {%- endfor %}
 {%- if not restock_items %}
     <div class="restock-row"><span class="rk-sub">Nothing currently qualifies &mdash; no cellar bottle depleted in the last six months rated very good or outstanding while missing from the shelf.</span></div>
@@ -82,18 +85,7 @@
     <div class="tns-block">
       <div class="tns-title">Tasted, never stocked</div>
 {%- for t in tasted_outstanding %}
-      <div class="restock-row{% if t.note %} has-note{% endif %}"{% if t.note %} onclick="var n=this.querySelector('.restock-note');if(n)n.classList.toggle('open')"{% endif %}>
-        <div class="rk-main">
-          <span class="rk-wine">{{ t.wine }}{% if t.note %} <span class="rk-note-ind">&#9656; note</span>{% endif %}</span>
-          <span class="rk-sub">{{ t.producer }} &middot; {{ t.vintage }}</span>
-{%- if t.note %}
-          <div class="restock-note">&ldquo;{{ t.note }}&rdquo;</div>
-{%- endif %}
-        </div>
-        <span class="rk-cat">{{ t.context }}</span>
-        <span class="rk-date">{{ t.date_label }}</span>
-        <span class="rk-badge"><span class="restock-badge outstanding">{{ t.rating }}</span></span>
-      </div>
+      {{ restock_row(t, badge_cls=' outstanding') }}
 {%- endfor %}
 {%- if tasted_vg %}
       <div class="tns-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">&#9656; {{ tasted_vg|length }} more rated very good</div>
